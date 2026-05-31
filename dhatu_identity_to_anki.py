@@ -354,6 +354,27 @@ def back_identity(dhatu: dict, roopa: dict = None) -> str:
 
     note_html = f'<div class="note-box">{note}</div>' if note else ""
 
+    # ── Roop accordions: plat + alat full 3×3 tables ─────────────────────────
+    accordions = ""
+    for lk in ("plat", "alat"):
+        raw = roopa.get(lk, "").strip()
+        if not raw:
+            continue
+        lmeta    = LAKARA_META.get(lk, (lk, "?", lk))
+        lak_name = lmeta[0]
+        pada_pfx = lmeta[1]
+        tbl_html = render_table_html(parse_roopa_row(raw), pada_pfx)
+        accordions += (
+            f'<details style="margin-top:8px; border:1px solid #e0e0e0; border-radius:6px; padding:4px 8px;">'
+            f'<summary style="cursor:pointer; font-weight:600; color:#1a3a5c;">{lak_name}</summary>'
+            f'{tbl_html}'
+            f'</details>'
+        )
+    accordions_html = (
+        f'<hr><div style="font-size:14px; font-weight:600; color:#1a3a5c; margin-bottom:4px;">लट् roop</div>{accordions}'
+        if accordions else ""
+    )
+
     return f"""
 {quicklook}
 <div style="font-size:14px; font-weight:600; color:#1a3a5c; margin-bottom:4px;">Meanings</div>
@@ -363,6 +384,7 @@ def back_identity(dhatu: dict, roopa: dict = None) -> str:
 <div class="meta-grid">{meta_html}</div>
 {up_html}
 {note_html}
+{accordions_html}
 """
 
 
