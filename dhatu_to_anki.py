@@ -299,21 +299,25 @@ def back_identity(dhatu: dict, roopa: dict = None) -> str:
         lat_chips.append(
             f'<span style="background:#d6eaf8;color:#1a5276;padding:3px 10px;'
             f'border-radius:999px;font-size:13px;font-weight:600;"'
-            f' title="लट् परस्मैपद प्रथमपुरुष एकवचन">{plat_form}</span>'
-        )
+            f' title="लट् परस्मैपद प्रथमपुरुष एकवचन">'
+            f'{plat_form}<sup style="font-size:9px;font-weight:700;'
+            f'vertical-align:super;line-height:0;margin-left:2px;">PP</sup></span>'
+    )
     if alat_form:
         lat_chips.append(
             f'<span style="background:#e8daef;color:#4a235a;padding:3px 10px;'
             f'border-radius:999px;font-size:13px;font-weight:600;"'
-            f' title="लट् आत्मनेपद प्रथमपुरुष एकवचन">{alat_form}</span>'
-        )
+            f' title="लट् आत्मनेपद प्रथमपुरुष एकवचन">'
+            f'{alat_form}<sup style="font-size:9px;font-weight:700;'
+            f'vertical-align:super;line-height:0;margin-left:2px;">AP</sup></span>'
+    )
     lat_str = " / ".join(lat_chips) if lat_chips else ""
 
     quicklook = (
         f'<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;'
         f'padding:8px 12px;background:#f4f6f7;border-radius:8px;margin-bottom:12px;'
         f'border-left:3px solid #1a5276;">'
-        f'<span style="font-size:17px;font-weight:700;color:#1a3a5c;">{aud}</span>'
+        f'<span style="font-size:17px;font-weight:700;color:#1a3a5c;">{d}</span>'
         f'<span style="color:#bbb;">—</span>'
         f'<span style="font-size:13px;color:#555;">{artha}</span>'
         + (f'<span style="color:#bbb;">·</span>{lat_str}' if lat_str else "")
@@ -484,27 +488,41 @@ def main():
     parser = argparse.ArgumentParser(
         description="Convert dhatu JSON + roopa JSON → Anki .apkg"
     )
-    parser.add_argument("--dhatu",  required=True, help="Path to dhatu JSON (array or single object)")
+    parser.add_argument("--dhatu",  default="dhatu.json",
+                        help="Path to dhatu JSON (default: dhatu.json)")
+    parser.add_argument("--roopa",  default="dhatuforms_vidyut_shuddha_kartari.json",
+                        help="Path to roopa JSON (default: dhatuforms_vidyut_shuddha_kartari.json)")
     parser.add_argument("--output", default="dhatu_deck.apkg", help="Output .apkg path")
     parser.add_argument("--deck",   default="Sanskrit Dhātu Deck", help="Deck name")
     parser.add_argument("--lakara", nargs="*",
                         help="Lakara keys to include (default: all). e.g. alat plat alang plang")
     parser.add_argument("--identity-only", action="store_true",
                         help="Generate only identity cards (no roop tables)")
-    parser.add_argument("--roopa", default=None,
-                        help="Path to roopa JSON (dict keyed by baseindex). Optional if --identity-only")
     args = parser.parse_args()
 
-    # Load dhatu data — accept array or single object
+    # ── Load dhatu data ──────────────────────────────────────────────────────
+    # Supports: { "name": "dhatu", "data": [...] }  OR  plain array  OR  single object
     with open(args.dhatu, encoding="utf-8") as f:
         raw = json.load(f)
-    dhatu_list = raw if isinstance(raw, list) else [raw]
+    if isinstance(raw, dict) and "data" in raw:
+        dhatu_list = raw["data"]
+    elif isinstance(raw, list):
+        dhatu_list = raw
+    else:
+        dhatu_list = [raw]
 
-    # Load roopa data (optional when identity-only)
+    # ── Load roopa data ──────────────────────────────────────────────────────
+    # Supports: plain dict keyed by baseindex  OR  { "data": { "01.0001": {...} } }
     roopa_map = {}
-    if args.roopa:
+    if os.path.exists(args.roopa):
         with open(args.roopa, encoding="utf-8") as f:
-            roopa_map = json.load(f)
+            raw_r = json.load(f)
+        if isinstance(raw_r, dict) and "data" in raw_r:
+            roopa_map = raw_r["data"]
+        else:
+            roopa_map = raw_r
+    else:
+        print(f"  ⚠ Roopa file not found: {args.roopa} — skipping roop cards.")
 
     print(f"Loaded {len(dhatu_list)} dhātus, {len(roopa_map)} roopa entries.")
 
