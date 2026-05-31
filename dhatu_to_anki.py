@@ -488,12 +488,12 @@ def main():
     parser = argparse.ArgumentParser(
         description="Convert dhatu JSON + roopa JSON → Anki .apkg"
     )
-    parser.add_argument("--dhatu",  default="dhatu.json",
+    parser.add_argument("--dhatu",  default="./data_files/dhatu.json",
                         help="Path to dhatu JSON (default: dhatu.json)")
-    parser.add_argument("--roopa",  default="dhatuforms_vidyut_shuddha_kartari.json",
+    parser.add_argument("--roopa",  default="./data_files/dhatuforms_vidyut_shuddha_kartari.json",
                         help="Path to roopa JSON (default: dhatuforms_vidyut_shuddha_kartari.json)")
-    parser.add_argument("--output", default="dhatu_deck.apkg", help="Output .apkg path")
-    parser.add_argument("--deck",   default="Sanskrit Dhātu Deck", help="Deck name")
+    parser.add_argument("--output", default="./decks/dhatu_deck.apkg", help="Output .apkg path")
+    parser.add_argument("--deck",   default="Dhātu Identity Deck", help="Deck name")
     parser.add_argument("--lakara", nargs="*",
                         help="Lakara keys to include (default: all). e.g. alat plat alang plang")
     parser.add_argument("--identity-only", action="store_true",
