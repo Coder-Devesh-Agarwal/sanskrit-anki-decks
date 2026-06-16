@@ -1,0 +1,21 @@
+@import 'tailwindcss';
+
+:root {
+  --dev-font: 'Noto Sans Devanagari', 'Siddhanta', 'Sanskrit 2003', serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.dev {
+  font-family: var(--dev-font);
+}
