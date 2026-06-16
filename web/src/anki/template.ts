@@ -23,6 +23,7 @@ export const MODEL_FIELDS = [
   "CardNote",
   "Front",
   "Back",
+  "Json", // exact card JSON — enables lossless fetch-back from Anki
 ];
 
 const NOTE_LABEL: Record<string, string> = {
@@ -158,6 +159,7 @@ export function renderFields(card: Card): Record<string, string> {
     CardNote: card.cardNote,
     Front: renderFront(card),
     Back: renderBack(card),
+    Json: JSON.stringify(card),
   };
 }
 

@@ -8,7 +8,7 @@ import {
   type Card,
 } from '../store/cards'
 import { loadSettings } from '../store/settings'
-import { syncCards } from '../anki/ankiConnect'
+import { syncCards, fetchCards } from '../anki/ankiConnect'
 
 export function Decklist() {
   const nav = useNavigate()
@@ -28,6 +28,23 @@ export function Decklist() {
       setMsg(`Synced — ${r.added} added, ${r.updated} updated into “${s.deckName}”.`)
     } catch (e) {
       setMsg(`Sync failed: ${String(e)} — check Settings / AnkiConnect.`)
+    }
+  }
+
+  async function fetchFromAnki() {
+    const s = loadSettings()
+    setMsg('Fetching from Anki…')
+    try {
+      const fetched = await fetchCards(s.ankiUrl)
+      if (fetched.length === 0) {
+        setMsg('No Śabda-Siddhi notes found in Anki.')
+        return
+      }
+      const n = importJson(JSON.stringify(fetched)) // merge by id (Anki wins)
+      refresh()
+      setMsg(`Fetched ${n} card(s) from Anki.`)
+    } catch (e) {
+      setMsg(`Fetch failed: ${String(e)} — check Settings / AnkiConnect.`)
     }
   }
 
@@ -54,6 +71,9 @@ export function Decklist() {
         </Link>
         <button onClick={syncAll} className="rounded bg-emerald-600 px-4 py-2 hover:bg-emerald-500">
           Sync to Anki
+        </button>
+        <button onClick={fetchFromAnki} className="rounded bg-indigo-600 px-4 py-2 hover:bg-indigo-500">
+          Fetch from Anki
         </button>
         <button onClick={() => downloadJson()} className="rounded bg-slate-700 px-4 py-2 hover:bg-slate-600">
           Export JSON
