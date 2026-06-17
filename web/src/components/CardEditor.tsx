@@ -101,7 +101,7 @@ export function CardEditor({
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">
             सिद्धि-क्रमः (Steps)
           </h2>
           <button onClick={addStep} className="rounded bg-slate-700 px-3 py-1 text-sm hover:bg-slate-600">

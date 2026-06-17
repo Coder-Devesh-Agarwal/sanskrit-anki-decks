@@ -16,8 +16,8 @@ body,
 
 body {
   margin: 0;
-  background: var(--color-slate-950);
-  color: var(--color-slate-200);
+  background: #272828;
+  color: var(--color-slate-100);
 }
 
 /* Light theme: reverse the slate ramp. Tailwind v4 utilities reference these

@@ -119,7 +119,8 @@ export function renderBack(card: Card): string {
         `</ol>`;
     }
     // separate note for the secondary sūtras
-    if (st.linkedNote) reveal += `<div class="ss-note rich-html">${st.linkedNote}</div>`;
+    if (st.linkedNote)
+      reveal += `<div class="ss-note rich-html">${st.linkedNote}</div>`;
     const hasReveal = reveal !== "";
     const head =
       `<span class="ss-num">${i + 1}</span>` +
@@ -194,10 +195,30 @@ export function renderFields(card: Card): Record<string, string> {
 // `media` is the name uploaded to Anki's collection during sync (leading underscore
 // stops Anki "check media" from deleting it as unused).
 export const FONT_FACES = [
-  { src: "AdishilaVedic.ttf", media: "_adishila_vedic.ttf", weight: 400, style: "normal" },
-  { src: "AdishilaVedicBold.ttf", media: "_adishila_vedic_bold.ttf", weight: 700, style: "normal" },
-  { src: "AdishilaVedicItalic.ttf", media: "_adishila_vedic_italic.ttf", weight: 400, style: "italic" },
-  { src: "AdishilaVedicBoldItalic.ttf", media: "_adishila_vedic_bolditalic.ttf", weight: 700, style: "italic" },
+  {
+    src: "AdishilaVedic.ttf",
+    media: "_adishila_vedic.ttf",
+    weight: 400,
+    style: "normal",
+  },
+  {
+    src: "AdishilaVedicBold.ttf",
+    media: "_adishila_vedic_bold.ttf",
+    weight: 700,
+    style: "normal",
+  },
+  {
+    src: "AdishilaVedicItalic.ttf",
+    media: "_adishila_vedic_italic.ttf",
+    weight: 400,
+    style: "italic",
+  },
+  {
+    src: "AdishilaVedicBoldItalic.ttf",
+    media: "_adishila_vedic_bolditalic.ttf",
+    weight: 700,
+    style: "italic",
+  },
 ] as const;
 
 const FONT_FACE_CSS = FONT_FACES.map(
@@ -207,7 +228,7 @@ const FONT_FACE_CSS = FONT_FACES.map(
 
 export const MODEL_CSS = `
 ${FONT_FACE_CSS}
-.ss-card{--bg:#0f172a;--fg:#e2e8f0;--q:#f1f5f9;--muted:#64748b;--border:#334155;--step-bg:rgba(30,41,59,.4);--chip-bg:#1e293b;--ref:#94a3b8;--num-bg:#334155;--num-fg:#f1f5f9;--note:#cbd5e1;--gloss-bg:#020617;--gloss-border:#475569;--en:#cbd5e1;--nlbl:#38bdf8;--res-border:rgba(5,150,105,.5);--res-bg:rgba(6,78,59,.3);--res-lbl:#34d399;--res-val:#d1fae5;--cn-border:rgba(180,83,9,.5);--cn-bg:rgba(69,26,3,.3);--cn-lbl:#fbbf24;--cn-val:#fef3c7}
+.ss-card{--bg:#272828;--fg:#e2e8f0;--q:#f1f5f9;--muted:#ffffff;--border:#334155;--step-bg:rgba(30,41,59,.4);--chip-bg:#1e293b;--ref:#94a3b8;--num-bg:#334155;--num-fg:#f1f5f9;--note:#cbd5e1;--gloss-bg:#020617;--gloss-border:#475569;--en:#cbd5e1;--nlbl:#38bdf8;--res-border:rgba(5,150,105,.5);--res-bg:rgba(6,78,59,.3);--res-lbl:#34d399;--res-val:#d1fae5;--cn-border:rgba(180,83,9,.5);--cn-bg:rgba(69,26,3,.3);--cn-lbl:#fbbf24;--cn-val:#fef3c7}
 .ss-card.ss-light{--bg:#ffffff;--fg:#1e293b;--q:#0f172a;--muted:#64748b;--border:#cbd5e1;--step-bg:#f8fafc;--chip-bg:#f1f5f9;--ref:#475569;--num-bg:#cbd5e1;--num-fg:#0f172a;--note:#334155;--gloss-bg:#ffffff;--gloss-border:#cbd5e1;--en:#334155;--nlbl:#0284c7;--res-border:#6ee7b7;--res-bg:#ecfdf5;--res-lbl:#047857;--res-val:#065f46;--cn-border:#fcd34d;--cn-bg:#fffbeb;--cn-lbl:#b45309;--cn-val:#92400e}
 .ss-card{font-family:'Adishila Vedic','Noto Sans Devanagari','Siddhanta',serif;font-size:16px;font-weight:400;background:var(--bg);color:var(--fg);max-width:700px;margin:0 auto;padding:8px;text-align:left}
 .ss-card strong{font-weight:700}

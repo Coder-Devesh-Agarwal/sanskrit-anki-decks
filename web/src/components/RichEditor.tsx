@@ -96,7 +96,7 @@ export function RichEditor({ value, onChange }: Props) {
           <span className="text-[10px] uppercase tracking-wide text-slate-500">
             {outputScheme}
           </span>
-          <span className="dev flex-1 text-sm text-emerald-200 text-wrap whitespace-break-spaces">
+          <span className="dev flex-1 text-lg text-emerald-200 text-wrap whitespace-break-spaces">
             {preview}
           </span>
         </div>
