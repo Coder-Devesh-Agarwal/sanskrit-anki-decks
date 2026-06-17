@@ -72,25 +72,25 @@ function promptText(card: Card): string {
     : "मूलं विश्लेषय (Identify the base)";
 }
 
+// Card text fields hold rich HTML (from RichEditor) — inserted verbatim. Only
+// app-generated plain text (prompt label, sūtra chip text) is escaped.
 export function renderFront(card: Card): string {
   return (
     `<div class="ss-card"><div class="ss-prompt">${esc(promptText(card))}</div>` +
-    `<div class="ss-q">${esc(card.question)}</div></div>`
+    `<div class="ss-q rich-html">${card.question}</div></div>`
   );
 }
 
 export function renderBack(card: Card): string {
   let h = `<div class="ss-card"><div class="ss-prompt">${esc(promptText(card))}</div>`;
-  h += `<div class="ss-q">${esc(card.question)}</div>`;
+  h += `<div class="ss-q rich-html">${card.question}</div>`;
 
   // result + optional click-to-reveal note
-  h += `<div class="ss-result"><div class="lbl">फलम् (Result)</div><div class="val">${esc(
-    card.finalResult,
-  )}</div>`;
+  h += `<div class="ss-result"><div class="lbl">फलम् (Result)</div><div class="val rich-html">${card.finalResult}</div>`;
   if (card.finalResultNote) {
     h +=
       `<details class="ss-inline"><summary>टिप्पणी देखें (note)</summary>` +
-      `<div class="ss-note">${esc(card.finalResultNote)}</div></details>`;
+      `<div class="ss-note rich-html">${card.finalResultNote}</div></details>`;
   }
   h += `</div>`;
 
@@ -104,11 +104,11 @@ export function renderBack(card: Card): string {
         `<div class="ss-rlbl">सम्बद्ध-सूत्राणि</div>` +
         st.linkedSutraIds.map(chipHtml).join("");
     }
-    if (st.note) reveal += `<div class="ss-note">${esc(st.note)}</div>`;
+    if (st.note) reveal += `<div class="ss-note rich-html">${st.note}</div>`;
     const hasReveal = reveal !== "";
     const head =
       `<span class="ss-num">${i + 1}</span>` +
-      `<span class="expr">${esc(st.expr)}</span>` +
+      `<span class="expr rich-html">${st.expr}</span>` +
       `<div class="ss-chips">${vidhi}</div>`;
     h += hasReveal
       ? `<details class="ss-step"><summary>${head}</summary><div class="ss-reveal">${reveal}</div></details>`
@@ -117,12 +117,19 @@ export function renderBack(card: Card): string {
   h += `</div>`;
 
   if (card.cardNote) {
-    h += `<div class="ss-cardnote"><div class="lbl">टिप्पणी (Card note)</div><div class="val">${esc(
-      card.cardNote,
-    )}</div></div>`;
+    h += `<div class="ss-cardnote"><div class="lbl">टिप्पणी (Card note)</div><div class="val rich-html">${card.cardNote}</div></div>`;
   }
   h += `</div>`;
   return h;
+}
+
+// Strip tags for the plain-text granular summary fields.
+function stripHtml(html: string): string {
+  return (html ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 // Human-readable label for a sūtra, e.g. "वृद्धिरादैच् (1.1.1)".
@@ -141,9 +148,9 @@ function stepsText(card: Card): string {
         parts.push(`vidhi: ${st.vidhiSutraIds.map(sutraLabel).join("; ")}`);
       if (st.linkedSutraIds.length)
         parts.push(`linked: ${st.linkedSutraIds.map(sutraLabel).join("; ")}`);
-      if (st.note) parts.push(`note: ${st.note}`);
+      if (st.note) parts.push(`note: ${stripHtml(st.note)}`);
       const tail = parts.length ? ` — ${parts.join(" | ")}` : "";
-      return `${i + 1}. ${st.expr}${tail}`;
+      return `${i + 1}. ${stripHtml(st.expr)}${tail}`;
     })
     .join("\n");
 }
@@ -152,11 +159,11 @@ export function renderFields(card: Card): Record<string, string> {
   return {
     CardId: card.id,
     Direction: card.direction,
-    Question: card.question,
-    FinalResult: card.finalResult,
-    FinalResultNote: card.finalResultNote,
+    Question: stripHtml(card.question),
+    FinalResult: stripHtml(card.finalResult),
+    FinalResultNote: stripHtml(card.finalResultNote),
     Steps: stepsText(card),
-    CardNote: card.cardNote,
+    CardNote: stripHtml(card.cardNote),
     Front: renderFront(card),
     Back: renderBack(card),
     Json: JSON.stringify(card),
@@ -166,7 +173,11 @@ export function renderFields(card: Card): Record<string, string> {
 export const MODEL_CSS = `
 .ss-card{font-family:'Noto Sans Devanagari','Siddhanta',serif;background:#0f172a;color:#e2e8f0;max-width:700px;margin:0 auto;padding:8px;text-align:left}
 .ss-prompt{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:#64748b;margin-bottom:4px}
-.ss-q{font-size:20px;color:#f1f5f9;white-space:pre-wrap}
+.ss-q{font-size:20px;color:#f1f5f9}
+.rich-html p{margin:0 0 .25rem}
+.rich-html ul{list-style:disc;margin:.25rem 0;padding-left:1.25rem}
+.rich-html ol{list-style:decimal;margin:.25rem 0;padding-left:1.25rem}
+.rich-html u{text-decoration:underline}
 .ss-result{border:1px solid rgba(5,150,105,.5);background:rgba(6,78,59,.3);border-radius:10px;padding:14px;margin-top:16px}
 .ss-result .lbl{font-size:11px;font-weight:600;text-transform:uppercase;color:#34d399;margin-bottom:4px}
 .ss-result .val{font-size:24px;font-weight:600;color:#d1fae5}

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { Card, Direction, Step } from '../store/cards'
 import { SutraAutocomplete } from './SutraAutocomplete'
 import { SutraChip } from './SutraChip'
-import { TranslitInput } from './TranslitInput'
+import { RichEditor } from './RichEditor'
 import { TagInput } from './TagInput'
 import { suggestLinkedIds } from '../data/sutras'
 
@@ -86,14 +86,13 @@ export function CardEditor({
           </div>
         </Field>
         <Field label="प्रश्नः (Question / front)">
-          <TranslitInput multiline value={card.question} onChange={(v) => patch({ question: v })} />
+          <RichEditor value={card.question} onChange={(v) => patch({ question: v })} />
         </Field>
         <Field label="फलम् (Final result)">
-          <TranslitInput value={card.finalResult} onChange={(v) => patch({ finalResult: v })} />
+          <RichEditor value={card.finalResult} onChange={(v) => patch({ finalResult: v })} />
         </Field>
         <Field label="फल-टिप्पणी (Result note — click-to-reveal)">
-          <TranslitInput
-            multiline
+          <RichEditor
             value={card.finalResultNote}
             onChange={(v) => patch({ finalResultNote: v })}
           />
@@ -122,7 +121,7 @@ export function CardEditor({
               </div>
             </div>
             <Field label="रूपम् (expression at this step)">
-              <TranslitInput value={st.expr} onChange={(v) => patchStep(i, { expr: v })} />
+              <RichEditor value={st.expr} onChange={(v) => patchStep(i, { expr: v })} />
             </Field>
             <Field label="विधि-सूत्राणि (vidhi — shown on front of step)">
               <SutraAutocomplete onSelect={(id) => addVidhi(i, id)} />
@@ -161,7 +160,7 @@ export function CardEditor({
               </div>
             </Field>
             <Field label="टिप्पणी (step note)">
-              <TranslitInput multiline value={st.note} onChange={(v) => patchStep(i, { note: v })} />
+              <RichEditor value={st.note} onChange={(v) => patchStep(i, { note: v })} />
             </Field>
           </div>
         ))}
@@ -169,7 +168,7 @@ export function CardEditor({
 
       <section className="space-y-3 rounded-xl border border-slate-700 bg-slate-900/60 p-4">
         <Field label="अन्तिम-टिप्पणी (Card note — bottom)">
-          <TranslitInput multiline value={card.cardNote} onChange={(v) => patch({ cardNote: v })} />
+          <RichEditor value={card.cardNote} onChange={(v) => patch({ cardNote: v })} />
         </Field>
         <Field label="Tags (Enter to add a badge)">
           <TagInput value={card.tags} onChange={(tags) => patch({ tags })} />

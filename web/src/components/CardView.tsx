@@ -3,7 +3,17 @@ import type { Card } from '../store/cards'
 import { SutraChip } from './SutraChip'
 
 // Canonical study layout. The Anki note template (anki/template.ts) reproduces
-// this same structure/behaviour from the baked Payload JSON.
+// this same structure/behaviour. Card text fields hold rich HTML produced by the
+// RichEditor, so they are rendered as HTML.
+
+function Rich({ html, className }: { html: string; className?: string }) {
+  return (
+    <div
+      className={`rich-html ${className ?? ''}`}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  )
+}
 
 export function CardView({ card }: { card: Card }) {
   const [showBack, setShowBack] = useState(false)
@@ -32,7 +42,7 @@ function Front({ card }: { card: Card }) {
   return (
     <div>
       <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">{prompt}</div>
-      <div className="dev whitespace-pre-wrap text-xl text-slate-100">{card.question}</div>
+      <Rich className="dev text-xl text-slate-100" html={card.question} />
     </div>
   )
 }
@@ -56,7 +66,7 @@ function Back({ card }: { card: Card }) {
           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-400">
             टिप्पणी (Card note)
           </div>
-          <div className="dev whitespace-pre-wrap text-sm text-amber-100">{card.cardNote}</div>
+          <Rich className="dev text-sm text-amber-100" html={card.cardNote} />
         </div>
       )}
     </div>
@@ -70,7 +80,7 @@ function FinalResult({ card }: { card: Card }) {
       <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-400">
         फलम् (Result)
       </div>
-      <div className="dev text-2xl font-semibold text-emerald-100">{card.finalResult}</div>
+      <Rich className="dev text-2xl font-semibold text-emerald-100" html={card.finalResult} />
       {card.finalResultNote && (
         <>
           <button
@@ -80,9 +90,7 @@ function FinalResult({ card }: { card: Card }) {
             {showNote ? 'टिप्पणी छिपाएं' : 'टिप्पणी देखें (note)'}
           </button>
           {showNote && (
-            <div className="dev mt-1 whitespace-pre-wrap text-sm text-emerald-100/90">
-              {card.finalResultNote}
-            </div>
+            <Rich className="dev mt-1 text-sm text-emerald-100/90" html={card.finalResultNote} />
           )}
         </>
       )}
@@ -104,7 +112,7 @@ function StepRow({ index, step }: { index: number; step: import('../store/cards'
           {index + 1}
         </span>
         <span className="flex-1">
-          <span className="dev block text-lg text-slate-100">{step.expr}</span>
+          <Rich className="dev block text-lg text-slate-100" html={step.expr} />
           <span className="mt-1 flex flex-wrap gap-1.5">
             {step.vidhiSutraIds.map((id) => (
               <SutraChip key={id} id={id} />
@@ -128,7 +136,7 @@ function StepRow({ index, step }: { index: number; step: import('../store/cards'
             </div>
           )}
           {step.note && (
-            <div className="dev whitespace-pre-wrap text-sm text-slate-300">{step.note}</div>
+            <Rich className="dev text-sm text-slate-300" html={step.note} />
           )}
         </div>
       )}
