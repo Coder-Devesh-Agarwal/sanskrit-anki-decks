@@ -1,7 +1,11 @@
 @import 'tailwindcss';
 
+/* Adishila Vedic @font-face is injected at runtime (App.tsx) so the URLs respect
+   the Vite base path on GitHub Pages. */
+
 :root {
-  --dev-font: 'Noto Sans Devanagari', 'Siddhanta', 'Sanskrit 2003', serif;
+  --dev-font: 'Adishila Vedic', 'Noto Sans Devanagari', 'Siddhanta',
+    'Sanskrit 2003', serif;
 }
 
 html,
@@ -25,10 +29,15 @@ body {
   min-height: 3rem;
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
+  font-weight: 400; /* don't inherit bold; only <strong> is bold */
   outline: none;
 }
 .ss-rich:focus {
   outline: none;
+}
+.ss-rich strong,
+.rich-html strong {
+  font-weight: 700;
 }
 .ss-rich p {
   margin: 0 0 0.25rem;

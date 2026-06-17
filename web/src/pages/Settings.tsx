@@ -84,6 +84,21 @@ export function Settings() {
         </span>
       </div>
 
+      <label className="block">
+        <span className="mb-1 block text-xs text-slate-400">
+          Base font size — {s.baseFontSize}px (all sizes scale from this)
+        </span>
+        <input
+          type="range"
+          min={12}
+          max={28}
+          step={1}
+          value={s.baseFontSize}
+          onChange={(e) => setS({ ...s, baseFontSize: Number(e.target.value) })}
+          className="w-full"
+        />
+      </label>
+
       <div className="flex gap-2">
         <button onClick={save} className="rounded bg-emerald-600 px-4 py-2 hover:bg-emerald-500">
           Save

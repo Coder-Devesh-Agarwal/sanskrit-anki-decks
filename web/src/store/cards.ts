@@ -8,7 +8,8 @@ export interface Step {
   expr: string // expression / intermediate form at this step
   vidhiSutraIds: string[] // shown on the step (front of reveal)
   linkedSutraIds: string[] // paribhāṣā/sañjñā etc, revealed on click
-  note: string
+  note: string // note for the main (vidhi) sūtras
+  linkedNote?: string // separate note for the secondary (linked) sūtras
 }
 
 export interface Card {
@@ -59,7 +60,7 @@ export function emptyCard(): Card {
     question: '',
     finalResult: '',
     finalResultNote: '',
-    steps: [{ expr: '', vidhiSutraIds: [], linkedSutraIds: [], note: '' }],
+    steps: [{ expr: '', vidhiSutraIds: [], linkedSutraIds: [], note: '', linkedNote: '' }],
     cardNote: '',
     tags: [],
     createdAt: now,

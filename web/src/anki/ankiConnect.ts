@@ -9,6 +9,7 @@ import {
   MODEL_FIELDS,
   MODEL_TEMPLATES,
   MODEL_CSS,
+  FONT_FACES,
   renderFields,
 } from "./template";
 
@@ -48,6 +49,24 @@ async function ensureDeck(url: string, deckName: string): Promise<void> {
   await invoke(url, "createDeck", { deck: deckName });
 }
 
+// Upload the Adishila Vedic font faces into Anki's media so cards can use them.
+// Reads the files shipped under public/fonts/AdishilaVedic/. Best-effort per face:
+// missing files just fall back to the next font in the stack.
+async function uploadFont(url: string): Promise<void> {
+  for (const face of FONT_FACES) {
+    try {
+      const res = await fetch(`${import.meta.env.BASE_URL}fonts/AdishilaVedic/${face.src}`);
+      if (!res.ok) continue;
+      const buf = new Uint8Array(await res.arrayBuffer());
+      let bin = "";
+      for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+      await invoke(url, "storeMediaFile", { filename: face.media, data: btoa(bin) });
+    } catch {
+      /* font face is optional */
+    }
+  }
+}
+
 function fieldsFor(card: Card): Record<string, string> {
   return renderFields(card);
 }
@@ -65,6 +84,7 @@ export async function syncCards(
 ): Promise<SyncResult> {
   await ensureModel(url);
   await ensureDeck(url, deckName);
+  await uploadFont(url);
   let added = 0;
   let updated = 0;
   for (const card of cards) {

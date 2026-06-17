@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { loadSutras } from './data/sutras'
 import { loadGlosses } from './data/glosses'
+import { useSettings } from './store/settings'
+import { FONT_FACES } from './anki/template'
 
 export function App() {
   const [ready, setReady] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const { baseFontSize } = useSettings()
 
   useEffect(() => {
     // Glosses are optional — never block the app on them.
@@ -13,6 +16,26 @@ export function App() {
       .then(() => loadGlosses().catch(() => {}))
       .then(() => setReady(true))
       .catch((e) => setErr(String(e)))
+  }, [])
+
+  // Base font size drives every rem-based size across the app.
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${baseFontSize}px`
+  }, [baseFontSize])
+
+  // Inject Adishila Vedic @font-face with base-aware URLs (works on GitHub Pages).
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL
+    const css = FONT_FACES.map(
+      (f) =>
+        `@font-face{font-family:'Adishila Vedic';src:url('${base}fonts/AdishilaVedic/${f.src}') format('truetype');font-weight:${f.weight};font-style:${f.style};font-display:swap}`,
+    ).join('\n')
+    const el = document.createElement('style')
+    el.textContent = css
+    document.head.appendChild(el)
+    return () => {
+      document.head.removeChild(el)
+    }
   }, [])
 
   return (

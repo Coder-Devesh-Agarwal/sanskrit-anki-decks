@@ -100,7 +100,9 @@ function FinalResult({ card }: { card: Card }) {
 
 function StepRow({ index, step }: { index: number; step: import('../store/cards').Step }) {
   const [open, setOpen] = useState(false)
-  const hasMore = step.linkedSutraIds.length > 0 || step.note.length > 0
+  const linkedNote = step.linkedNote ?? ''
+  const hasMore =
+    step.linkedSutraIds.length > 0 || step.note.length > 0 || linkedNote.length > 0
   return (
     <li className="rounded-lg border border-slate-700 bg-slate-800/40">
       <button
@@ -122,22 +124,26 @@ function StepRow({ index, step }: { index: number; step: import('../store/cards'
         {hasMore && <span className="text-slate-500">{open ? '▾' : '▸'}</span>}
       </button>
       {open && (
-        <div className="space-y-2 border-t border-slate-700 px-3 py-3">
+        <div className="space-y-3 border-t border-slate-700 px-3 py-3">
+          {/* main note, directly below the vidhi sūtras */}
+          {step.note && <Rich className="dev text-sm text-slate-300" html={step.note} />}
+
           {step.linkedSutraIds.length > 0 && (
             <div>
               <div className="mb-1 text-[11px] uppercase tracking-wide text-slate-500">
                 सम्बद्ध-सूत्राणि (linked paribhāṣā / sañjñā)
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              <ol className="list-decimal space-y-1.5 pl-5">
                 {step.linkedSutraIds.map((id) => (
-                  <SutraChip key={id} id={id} showGloss />
+                  <li key={id}>
+                    <SutraChip id={id} showGloss />
+                  </li>
                 ))}
-              </div>
+              </ol>
             </div>
           )}
-          {step.note && (
-            <Rich className="dev text-sm text-slate-300" html={step.note} />
-          )}
+          {/* separate note for the secondary sūtras */}
+          {linkedNote && <Rich className="dev text-sm text-slate-300" html={linkedNote} />}
         </div>
       )}
     </li>

@@ -139,28 +139,35 @@ export function CardEditor({
                 ))}
               </div>
             </Field>
+            <Field label="टिप्पणी (note — below main sūtras)">
+              <RichEditor value={st.note} onChange={(v) => patchStep(i, { note: v })} />
+            </Field>
             <Field label="सम्बद्ध-सूत्राणि (paribhāṣā / sañjñā — revealed on click)">
               <SutraAutocomplete
                 placeholder="link a paribhāṣā / sañjñā sūtra…"
                 onSelect={(id) => addLinked(i, id)}
               />
-              <div className="mt-2 flex flex-wrap gap-1.5">
+              <ol className="mt-2 list-decimal space-y-1.5 pl-5">
                 {st.linkedSutraIds.map((id) => (
-                  <SutraChip
-                    key={id}
-                    id={id}
-                    showGloss
-                    onRemove={() =>
-                      patchStep(i, {
-                        linkedSutraIds: st.linkedSutraIds.filter((x) => x !== id),
-                      })
-                    }
-                  />
+                  <li key={id}>
+                    <SutraChip
+                      id={id}
+                      showGloss
+                      onRemove={() =>
+                        patchStep(i, {
+                          linkedSutraIds: st.linkedSutraIds.filter((x) => x !== id),
+                        })
+                      }
+                    />
+                  </li>
                 ))}
-              </div>
+              </ol>
             </Field>
-            <Field label="टिप्पणी (step note)">
-              <RichEditor value={st.note} onChange={(v) => patchStep(i, { note: v })} />
+            <Field label="सम्बद्ध-टिप्पणी (note — for secondary sūtras)">
+              <RichEditor
+                value={st.linkedNote ?? ''}
+                onChange={(v) => patchStep(i, { linkedNote: v })}
+              />
             </Field>
           </div>
         ))}
@@ -190,11 +197,13 @@ export function CardEditor({
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  // A <div>, not a <label>: wrapping a contenteditable rich editor in a <label>
+  // hijacks clicks (focus bounce, double-click selects the label, shortcuts break).
   return (
-    <label className="block">
+    <div className="block">
       <span className="dev mb-1 block text-xs text-slate-400">{label}</span>
       {children}
-    </label>
+    </div>
   )
 }
 function IconBtn({

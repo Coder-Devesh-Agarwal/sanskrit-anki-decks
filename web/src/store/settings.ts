@@ -10,6 +10,8 @@ export interface Settings {
   inputScheme: string
   /** scheme previews/conversions are shown in */
   outputScheme: string
+  /** base font size (px); all other sizes are relative (rem/em) to this */
+  baseFontSize: number
 }
 
 const KEY = 'shabdasiddhi.settings'
@@ -20,6 +22,7 @@ export const DEFAULT_SETTINGS: Settings = {
   deckName: 'Śabda-Siddhi',
   inputScheme: 'hk',
   outputScheme: 'devanagari',
+  baseFontSize: 16,
 }
 
 let _cache: Settings | null = null

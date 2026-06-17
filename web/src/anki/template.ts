@@ -8,6 +8,12 @@
 import type { Card } from "../store/cards";
 import { CATEGORY_META, getSutra } from "../data/sutras";
 import { getGloss } from "../data/glosses";
+import { loadSettings } from "../store/settings";
+
+// Opening tag for the card root, carrying the base font size all em units scale from.
+function cardOpen(): string {
+  return `<div class="ss-card" style="font-size:${loadSettings().baseFontSize}px">`;
+}
 
 export const MODEL_NAME = "Śabda-Siddhi";
 // Granular fields (separation of concern) for inspection/editing in Anki Browse,
@@ -76,13 +82,13 @@ function promptText(card: Card): string {
 // app-generated plain text (prompt label, sūtra chip text) is escaped.
 export function renderFront(card: Card): string {
   return (
-    `<div class="ss-card"><div class="ss-prompt">${esc(promptText(card))}</div>` +
+    `${cardOpen()}<div class="ss-prompt">${esc(promptText(card))}</div>` +
     `<div class="ss-q rich-html">${card.question}</div></div>`
   );
 }
 
 export function renderBack(card: Card): string {
-  let h = `<div class="ss-card"><div class="ss-prompt">${esc(promptText(card))}</div>`;
+  let h = `${cardOpen()}<div class="ss-prompt">${esc(promptText(card))}</div>`;
   h += `<div class="ss-q rich-html">${card.question}</div>`;
 
   // result + optional click-to-reveal note
@@ -99,17 +105,25 @@ export function renderBack(card: Card): string {
   card.steps.forEach((st, i) => {
     const vidhi = st.vidhiSutraIds.map(chipHtml).join("");
     let reveal = "";
+    // main note, directly below the vidhi sūtras
+    if (st.note) reveal += `<div class="ss-note rich-html">${st.note}</div>`;
+    // secondary sūtras as a numbered list
     if (st.linkedSutraIds.length) {
       reveal +=
         `<div class="ss-rlbl">सम्बद्ध-सूत्राणि</div>` +
-        st.linkedSutraIds.map(chipHtml).join("");
+        `<ol class="ss-linked">` +
+        st.linkedSutraIds.map((id) => `<li>${chipHtml(id)}</li>`).join("") +
+        `</ol>`;
     }
-    if (st.note) reveal += `<div class="ss-note rich-html">${st.note}</div>`;
+    // separate note for the secondary sūtras
+    if (st.linkedNote) reveal += `<div class="ss-note rich-html">${st.linkedNote}</div>`;
     const hasReveal = reveal !== "";
     const head =
       `<span class="ss-num">${i + 1}</span>` +
-      `<span class="expr rich-html">${st.expr}</span>` +
-      `<div class="ss-chips">${vidhi}</div>`;
+      `<div class="ss-body">` +
+      `<div class="expr rich-html">${st.expr}</div>` +
+      `<div class="ss-chips">${vidhi}</div>` +
+      `</div>`;
     h += hasReveal
       ? `<details class="ss-step"><summary>${head}</summary><div class="ss-reveal">${reveal}</div></details>`
       : `<div class="ss-step ss-static">${head}</div>`;
@@ -149,6 +163,7 @@ function stepsText(card: Card): string {
       if (st.linkedSutraIds.length)
         parts.push(`linked: ${st.linkedSutraIds.map(sutraLabel).join("; ")}`);
       if (st.note) parts.push(`note: ${stripHtml(st.note)}`);
+      if (st.linkedNote) parts.push(`linked-note: ${stripHtml(st.linkedNote)}`);
       const tail = parts.length ? ` — ${parts.join(" | ")}` : "";
       return `${i + 1}. ${stripHtml(st.expr)}${tail}`;
     })
@@ -170,51 +185,73 @@ export function renderFields(card: Card): Record<string, string> {
   };
 }
 
+// Font sizes are em (relative to .ss-card, whose px size is baked per card from
+// the base-font-size setting). 'Adishila Vedic' leads the Devanagari font stack.
+// Adishila Vedic faces. `src` is the file shipped under public/fonts/AdishilaVedic/;
+// `media` is the name uploaded to Anki's collection during sync (leading underscore
+// stops Anki "check media" from deleting it as unused).
+export const FONT_FACES = [
+  { src: "AdishilaVedic.ttf", media: "_adishila_vedic.ttf", weight: 400, style: "normal" },
+  { src: "AdishilaVedicBold.ttf", media: "_adishila_vedic_bold.ttf", weight: 700, style: "normal" },
+  { src: "AdishilaVedicItalic.ttf", media: "_adishila_vedic_italic.ttf", weight: 400, style: "italic" },
+  { src: "AdishilaVedicBoldItalic.ttf", media: "_adishila_vedic_bolditalic.ttf", weight: 700, style: "italic" },
+] as const;
+
+const FONT_FACE_CSS = FONT_FACES.map(
+  (f) =>
+    `@font-face{font-family:'Adishila Vedic';src:url('${f.media}');font-weight:${f.weight};font-style:${f.style};font-display:swap}`,
+).join("\n");
+
 export const MODEL_CSS = `
-.ss-card{font-family:'Noto Sans Devanagari','Siddhanta',serif;background:#0f172a;color:#e2e8f0;max-width:700px;margin:0 auto;padding:8px;text-align:left}
-.ss-prompt{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:#64748b;margin-bottom:4px}
-.ss-q{font-size:20px;color:#f1f5f9}
-.rich-html p{margin:0 0 .25rem}
-.rich-html ul{list-style:disc;margin:.25rem 0;padding-left:1.25rem}
-.rich-html ol{list-style:decimal;margin:.25rem 0;padding-left:1.25rem}
+${FONT_FACE_CSS}
+.ss-card{font-family:'Adishila Vedic','Noto Sans Devanagari','Siddhanta',serif;font-size:16px;font-weight:400;background:#0f172a;color:#e2e8f0;max-width:700px;margin:0 auto;padding:8px;text-align:left}
+.ss-card strong{font-weight:700}
+.ss-prompt{font-size:.7em;letter-spacing:.05em;text-transform:uppercase;color:#64748b;margin-bottom:4px}
+.ss-q{font-size:1.25em;color:#f1f5f9}
+.rich-html p{margin:0 0 .25em}
+.rich-html ul{list-style:disc;margin:.25em 0;padding-left:1.25em}
+.rich-html ol{list-style:decimal;margin:.25em 0;padding-left:1.25em}
 .rich-html u{text-decoration:underline}
 .ss-result{border:1px solid rgba(5,150,105,.5);background:rgba(6,78,59,.3);border-radius:10px;padding:14px;margin-top:16px}
-.ss-result .lbl{font-size:11px;font-weight:600;text-transform:uppercase;color:#34d399;margin-bottom:4px}
-.ss-result .val{font-size:24px;font-weight:600;color:#d1fae5}
+.ss-result .lbl{font-size:.7em;font-weight:600;text-transform:uppercase;color:#34d399;margin-bottom:4px}
+.ss-result .val{font-size:1.5em;font-weight:600;color:#d1fae5}
 .ss-inline{margin-top:8px}
-.ss-inline>summary{cursor:pointer;color:#34d399;font-size:12px;text-decoration:underline;list-style:none}
+.ss-inline>summary{cursor:pointer;color:#34d399;font-size:.75em;text-decoration:underline;list-style:none}
 .ss-inline>summary::-webkit-details-marker{display:none}
 .ss-steps{margin-top:16px}
-.ss-steps .lbl{font-size:11px;text-transform:uppercase;color:#64748b;margin-bottom:8px}
+.ss-steps .lbl{font-size:.7em;text-transform:uppercase;color:#64748b;margin-bottom:8px}
 .ss-step{border:1px solid #334155;background:rgba(30,41,59,.4);border-radius:10px;margin-bottom:8px;padding:12px}
-.ss-step>summary{cursor:pointer;list-style:none}
+.ss-step>summary{display:flex;align-items:flex-start;gap:8px;cursor:pointer;list-style:none}
 .ss-step>summary::-webkit-details-marker{display:none}
-.ss-step>summary::after{content:'▸';float:right;color:#64748b}
+.ss-step>summary::after{content:'▸';margin-left:8px;color:#64748b;flex-shrink:0}
 .ss-step[open]>summary::after{content:'▾'}
-.ss-step .expr{font-size:18px;color:#f1f5f9}
+.ss-body{flex:1;min-width:0}
+.ss-step .expr{font-size:1.125em;color:#f1f5f9}
 .ss-chips{margin-top:4px}
-.ss-num{display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:#334155;font-size:12px;margin-right:8px}
+.ss-num{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:1.6em;height:1.6em;border-radius:50%;background:#334155;font-size:.85em}
 .ss-reveal{border-top:1px solid #334155;margin-top:10px;padding-top:10px}
-.ss-rlbl{font-size:11px;color:#94a3b8;margin-bottom:4px;padding:4px}
-.ss-chip{position:relative;display:inline-flex;align-items:center;gap:6px;background:#1e293b;border:1px solid #334155;border-radius:6px;padding:4px 8px;font-size:13px;margin:3px 4px 0 0;cursor:help;outline:none}
-.ss-ref{font-size:11px;color:#94a3b8}
-.ss-gloss{font-size:11px;color:#94a3b8}
+.ss-rlbl{font-size:.7em;color:#94a3b8;margin-bottom:4px;padding:4px 0}
+.ss-linked{list-style:decimal;margin:.25em 0;padding-left:1.5em}
+.ss-linked>li{margin:.2em 0}
+.ss-chip{position:relative;display:inline-flex;align-items:center;gap:6px;background:#1e293b;border:1px solid #334155;border-radius:6px;padding:4px 8px;font-size:.8em;margin:3px 4px 0 0;cursor:help;outline:none}
+.ss-ref{font-size:.85em;color:#94a3b8}
+.ss-gloss{font-size:.85em;color:#94a3b8}
 .ss-glossbox{display:none;position:absolute;left:0;top:100%;z-index:30;margin-top:4px;width:300px;max-width:88vw;background:#020617;border:1px solid #475569;border-radius:8px;padding:10px;box-shadow:0 8px 24px rgba(0,0,0,.5);white-space:normal}
 .ss-chip:hover>.ss-glossbox,.ss-chip:focus>.ss-glossbox,.ss-chip:focus-within>.ss-glossbox{display:block}
-.ss-en{display:block;font-size:12px;color:#cbd5e1;margin-bottom:6px}
-.ss-nlbl{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#38bdf8;margin-bottom:2px}
-.ss-ntxt{display:block;font-size:12px;color:#e2e8f0;line-height:1.5;max-height:180px;overflow:auto}
-.ss-note{font-size:14px;color:#cbd5e1;white-space:pre-wrap;margin-top:6px}
+.ss-en{display:block;font-size:.75em;color:#cbd5e1;margin-bottom:6px}
+.ss-nlbl{display:block;font-size:.62em;text-transform:uppercase;letter-spacing:.05em;color:#38bdf8;margin-bottom:2px}
+.ss-ntxt{display:block;font-size:.75em;color:#e2e8f0;line-height:1.5;max-height:180px;overflow:auto}
+.ss-note{font-size:.875em;color:#cbd5e1;margin-top:6px}
 .ss-cardnote{border:1px solid rgba(180,83,9,.5);background:rgba(69,26,3,.3);border-radius:10px;padding:12px;margin-top:16px}
-.ss-cardnote .lbl{font-size:11px;font-weight:600;text-transform:uppercase;color:#fbbf24;margin-bottom:4px}
-.ss-cardnote .val{font-size:14px;color:#fef3c7;white-space:pre-wrap}
+.ss-cardnote .lbl{font-size:.7em;font-weight:600;text-transform:uppercase;color:#fbbf24;margin-bottom:4px}
+.ss-cardnote .val{font-size:.875em;color:#fef3c7}
 .bcat-vidhi{background:#0284c7;color:#e0f2fe}
 .bcat-sanjna{background:#059669;color:#d1fae5}
 .bcat-paribhasha{background:#9333ea;color:#f3e8ff}
 .bcat-atidesha{background:#d97706;color:#fef3c7}
 .bcat-adhikara{background:#e11d48;color:#ffe4e6}
 .bcat-other{background:#475569;color:#f1f5f9}
-.ss-badge{border-radius:4px;padding:1px 5px;font-size:10px;font-weight:600}
+.ss-badge{border-radius:4px;padding:1px 5px;font-size:.62em;font-weight:600}
 `;
 
 export const MODEL_TEMPLATES = [
