@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import Fuse from 'fuse.js'
 import { knownTags } from '../store/cards'
 
 // Tag input: type + Enter (or comma) to add a badge; Backspace on empty removes
@@ -26,10 +27,11 @@ export function TagInput({
   }
 
   const suggestions = useMemo(() => {
-    const ql = q.trim().toLowerCase()
-    return knownTags()
-      .filter((t) => !value.includes(t) && (!ql || t.toLowerCase().includes(ql)))
-      .slice(0, 12)
+    const pool = knownTags().filter((t) => !value.includes(t))
+    const ql = q.trim()
+    if (!ql) return pool.slice(0, 12)
+    const fuse = new Fuse(pool, { threshold: 0.4, ignoreLocation: true })
+    return fuse.search(ql).slice(0, 12).map((r) => r.item)
   }, [q, value])
 
   function onKey(e: React.KeyboardEvent<HTMLInputElement>) {

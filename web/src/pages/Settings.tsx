@@ -86,7 +86,7 @@ export function Settings() {
 
       <label className="block">
         <span className="mb-1 block text-xs text-slate-400">
-          Base font size — {s.baseFontSize}px (all sizes scale from this)
+          Web base font size — {s.baseFontSize}px (web app scales from this)
         </span>
         <input
           type="range"
@@ -98,6 +98,38 @@ export function Settings() {
           className="w-full"
         />
       </label>
+
+      <label className="block">
+        <span className="mb-1 block text-xs text-slate-400">
+          Anki card font size — {s.ankiFontSize}px (rendered Anki card scales from this)
+        </span>
+        <input
+          type="range"
+          min={12}
+          max={40}
+          step={1}
+          value={s.ankiFontSize}
+          onChange={(e) => setS({ ...s, ankiFontSize: Number(e.target.value) })}
+          className="w-full"
+        />
+      </label>
+
+      <div className="block">
+        <span className="mb-1 block text-xs text-slate-400">Theme (web + Anki card)</span>
+        <div className="flex gap-2">
+          {(['dark', 'light'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setS({ ...s, theme: t })}
+              className={`rounded px-3 py-1.5 text-sm ${
+                s.theme === t ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-300'
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="flex gap-2">
         <button onClick={save} className="rounded bg-emerald-600 px-4 py-2 hover:bg-emerald-500">

@@ -8,7 +8,7 @@ import { FONT_FACES } from './anki/template'
 export function App() {
   const [ready, setReady] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const { baseFontSize } = useSettings()
+  const { baseFontSize, theme } = useSettings()
 
   useEffect(() => {
     // Glosses are optional — never block the app on them.
@@ -22,6 +22,11 @@ export function App() {
   useEffect(() => {
     document.documentElement.style.fontSize = `${baseFontSize}px`
   }, [baseFontSize])
+
+  // Theme toggles a class on <html>; index.css remaps the slate palette under it.
+  useEffect(() => {
+    document.documentElement.classList.toggle('theme-light', theme === 'light')
+  }, [theme])
 
   // Inject Adishila Vedic @font-face with base-aware URLs (works on GitHub Pages).
   useEffect(() => {

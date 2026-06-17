@@ -101,6 +101,21 @@ export function deleteCard(id: string): void {
   writeAll(listCards().filter((c) => c.id !== id))
 }
 
+// Clone a card under a fresh id, save it, and return the copy.
+export function duplicateCard(id: string): Card | undefined {
+  const src = getCard(id)
+  if (!src) return undefined
+  const now = Date.now()
+  const copy: Card = {
+    ...structuredClone(src),
+    id: uid(),
+    createdAt: now,
+    updatedAt: now,
+  }
+  saveCard(copy)
+  return copy
+}
+
 export function exportJson(): string {
   return JSON.stringify(listCards(), null, 2)
 }

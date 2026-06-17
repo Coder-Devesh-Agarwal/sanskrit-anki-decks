@@ -3,6 +3,7 @@
 // vidhi/paribhāṣā/sañjñā classification used throughout the app.
 
 import Sanscript from '@indic-transliteration/sanscript'
+import Fuse from 'fuse.js'
 
 export type SutraCategory =
   | 'vidhi'
@@ -111,6 +112,24 @@ function normalize(raw: RawSutra): Sutra {
 let _byId: Map<string, Sutra> | null = null
 let _all: Sutra[] = []
 let _loading: Promise<void> | null = null
+let _fuse: Fuse<Sutra> | null = null
+
+function fuse(): Fuse<Sutra> {
+  if (!_fuse) {
+    _fuse = new Fuse(_all, {
+      includeScore: true,
+      ignoreLocation: true,
+      threshold: 0.4,
+      keys: [
+        { name: 'slp', weight: 1 },
+        { name: 'e', weight: 0.8 },
+        { name: 's', weight: 0.8 },
+        { name: 'ref', weight: 0.6 },
+      ],
+    })
+  }
+  return _fuse
+}
 
 function dataUrl(name: string): string {
   // import.meta.env.BASE_URL respects Vite `base` (e.g. /sanskrit-anki-decks/)
@@ -127,6 +146,7 @@ export async function loadSutras(): Promise<void> {
     const arr: RawSutra[] = Array.isArray(json) ? json : json.data
     _all = arr.map(normalize)
     _byId = new Map(_all.map((s) => [s.id, s]))
+    _fuse = null // rebuilt lazily against the new data
   })()
   return _loading
 }
@@ -143,9 +163,10 @@ function hasDevanagari(s: string): boolean {
   return /[ऀ-ॿ]/.test(s)
 }
 
-// Ranked, script-agnostic search. The query is matched against, in priority:
-// sūtra number (1.1.1 / "1 1 1"), the SLP1 transliteration of the sūtra (query
-// converted from `scheme`), raw Devanagari, and the dataset's own `e` field.
+// Fuzzy, script-agnostic search (Fuse.js). The query is converted to SLP1 in the
+// chosen scheme (or from Devanagari if it already is), then matched fuzzily against
+// the SLP1 key; the raw query is matched against the transliteration, Devanagari
+// and reference. Results from both passes are merged by best score.
 export function searchSutras(
   query: string,
   scheme: string = 'hk',
@@ -153,27 +174,26 @@ export function searchSutras(
 ): Sutra[] {
   const raw = query.trim()
   if (!raw) return []
-  const ql = raw.toLowerCase()
   const refq = raw.replace(/\s+/g, '.') // "1 1 1" → "1.1.1"
-  // SLP1 of the query. If the query already contains Devanagari, convert from
-  // Devanagari regardless of the chosen scheme.
   const qslp = hasDevanagari(raw) ? queryToSlp(raw, 'devanagari') : queryToSlp(raw, scheme)
 
-  const out: { s: Sutra; score: number }[] = []
-  for (const s of _all) {
-    let score = -1
-    if (s.ref === refq) score = 0
-    else if (qslp && s.slp.startsWith(qslp)) score = 1
-    else if (hasDevanagari(raw) && s.s.startsWith(raw)) score = 1
-    else if (s.e.toLowerCase().startsWith(ql)) score = 2
-    else if (qslp && s.slp.includes(qslp)) score = 3
-    else if (hasDevanagari(raw) && s.s.includes(raw)) score = 3
-    else if (s.e.toLowerCase().includes(ql)) score = 4
-    else if (s.ref.startsWith(refq)) score = 5
-    if (score >= 0) out.push({ s, score })
+  const best = new Map<string, { s: Sutra; score: number }>()
+  const consume = (results: { item: Sutra; score?: number }[]) => {
+    for (const r of results) {
+      const score = r.score ?? 1
+      const prev = best.get(r.item.id)
+      if (!prev || score < prev.score) best.set(r.item.id, { s: r.item, score })
+    }
   }
-  out.sort((a, b) => a.score - b.score || a.s.id.localeCompare(b.s.id))
-  return out.slice(0, limit).map((x) => x.s)
+  const f = fuse()
+  if (qslp) consume(f.search(qslp))
+  consume(f.search(raw))
+  if (refq !== raw) consume(f.search(refq))
+
+  return [...best.values()]
+    .sort((a, b) => a.score - b.score || a.s.id.localeCompare(b.s.id))
+    .slice(0, limit)
+    .map((x) => x.s)
 }
 
 const SUGGEST: SutraCategory[] = ['sanjna', 'paribhasha', 'atidesha', 'adhikara']

@@ -10,8 +10,12 @@ export interface Settings {
   inputScheme: string
   /** scheme previews/conversions are shown in */
   outputScheme: string
-  /** base font size (px); all other sizes are relative (rem/em) to this */
+  /** base font size (px) for the web app; all sizes are relative (rem) to this */
   baseFontSize: number
+  /** base font size (px) for the rendered Anki card */
+  ankiFontSize: number
+  /** UI + card colour theme */
+  theme: 'dark' | 'light'
 }
 
 const KEY = 'shabdasiddhi.settings'
@@ -23,6 +27,8 @@ export const DEFAULT_SETTINGS: Settings = {
   inputScheme: 'hk',
   outputScheme: 'devanagari',
   baseFontSize: 16,
+  ankiFontSize: 20,
+  theme: 'dark',
 }
 
 let _cache: Settings | null = null

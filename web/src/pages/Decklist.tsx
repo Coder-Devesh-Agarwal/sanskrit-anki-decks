@@ -1,8 +1,10 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import Fuse from "fuse.js";
 import {
   listCards,
   deleteCard,
+  duplicateCard,
   downloadJson,
   importJson,
   type Card,
@@ -23,15 +25,67 @@ function Rich({ html, className }: { html: string; className?: string }) {
   );
 }
 
+function plain(html: string): string {
+  return (html ?? "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
 export function Decklist() {
   const nav = useNavigate();
   const [cards, setCards] = useState<Card[]>(() => listCards());
   const [msg, setMsg] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [activeTags, setActiveTags] = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function refresh() {
     setCards(listCards());
   }
+
+  // tags present on the current cards, for the filter row
+  const allTags = useMemo(
+    () => Array.from(new Set(cards.flatMap((c) => c.tags))).sort(),
+    [cards],
+  );
+
+  function toggleTag(t: string) {
+    setActiveTags((prev) =>
+      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
+    );
+  }
+
+  // tag filter first (must have ALL active tags), then fuzzy search via Fuse
+  const tagFiltered = useMemo(
+    () =>
+      activeTags.length
+        ? cards.filter((c) => activeTags.every((t) => c.tags.includes(t)))
+        : cards,
+    [cards, activeTags],
+  );
+
+  const fuse = useMemo(
+    () =>
+      new Fuse(
+        tagFiltered.map((c) => ({
+          card: c,
+          question: plain(c.question),
+          finalResult: plain(c.finalResult),
+          tags: c.tags.join(" "),
+          steps: c.steps.map((s) => plain(s.expr)).join(" "),
+        })),
+        {
+          keys: ["question", "finalResult", "tags", "steps"],
+          threshold: 0.4,
+          ignoreLocation: true,
+        },
+      ),
+    [tagFiltered],
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim();
+    if (!q) return tagFiltered;
+    return fuse.search(q).map((r) => r.item.card);
+  }, [query, tagFiltered, fuse]);
 
   async function syncAll() {
     const s = loadSettings();
@@ -126,13 +180,53 @@ export function Decklist() {
         </div>
       )}
 
+      {cards.length > 0 && (
+        <div className="space-y-2">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search question / result / steps / tags…"
+            className="dev w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-sky-500"
+          />
+          {allTags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {allTags.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => toggleTag(t)}
+                  className={`rounded px-2 py-0.5 text-xs ${
+                    activeTags.includes(t)
+                      ? "bg-sky-600 text-white"
+                      : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+              {activeTags.length > 0 && (
+                <button
+                  onClick={() => setActiveTags([])}
+                  className="rounded px-2 py-0.5 text-xs text-slate-400 underline"
+                >
+                  clear
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {cards.length === 0 ? (
         <div className="rounded border border-dashed border-slate-700 p-8 text-center text-slate-500">
           No cards yet. Create one.
         </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded border border-dashed border-slate-700 p-8 text-center text-slate-500">
+          No cards match.
+        </div>
       ) : (
         <ul className="space-y-2">
-          {cards.map((c) => (
+          {filtered.map((c) => (
             <li
               key={c.id}
               className="flex items-center gap-3 rounded-lg border border-slate-700 bg-slate-900/60 p-3"
@@ -162,6 +256,16 @@ export function Decklist() {
               >
                 edit
               </Link>
+              <button
+                onClick={() => {
+                  const copy = duplicateCard(c.id);
+                  refresh();
+                  if (copy) nav(`/author/${copy.id}`);
+                }}
+                className="rounded bg-slate-800 px-2 py-1 text-xs hover:bg-slate-700"
+              >
+                dup
+              </button>
               <button
                 onClick={() => {
                   if (confirm("Delete this card?")) {
