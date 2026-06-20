@@ -1,25 +1,41 @@
-import { useState } from 'react'
-import { DEFAULT_SETTINGS, loadSettings, saveSettings } from '../store/settings'
-import { testConnection } from '../anki/ankiConnect'
-import { SCHEMES, transliterate } from '../lib/translit'
+import { useRef, useState } from "react";
+import {
+  DEFAULT_SETTINGS,
+  loadSettings,
+  saveSettings,
+} from "../store/settings";
+import { testConnection } from "../anki/ankiConnect";
+import { renameDeck } from "../store/cards";
+import { SCHEMES, transliterate } from "../lib/translit";
 
 export function Settings() {
-  const [s, setS] = useState(() => loadSettings())
-  const [status, setStatus] = useState<string | null>(null)
-  const origin = window.location.origin
+  const [s, setS] = useState(() => loadSettings());
+  const [status, setStatus] = useState<string | null>(null);
+  const origin = window.location.origin;
+  const originalDeck = useRef(loadSettings().deckName);
 
   function save() {
-    saveSettings(s)
-    setStatus('Saved.')
+    const old = originalDeck.current;
+    const next = s.deckName.trim() || old;
+    // renaming the active deck moves its cards + updates the deck list
+    if (next !== old) {
+      renameDeck(old, next);
+      const decks = s.decks.map((d) => (d === old ? next : d));
+      saveSettings({ ...s, deckName: next, decks });
+      originalDeck.current = next;
+    } else {
+      saveSettings(s);
+    }
+    setStatus("Saved.");
   }
 
   async function test() {
-    setStatus('Testing…')
+    setStatus("Testing…");
     try {
-      const v = await testConnection(s.ankiUrl)
-      setStatus(`Connected. AnkiConnect version ${v}.`)
+      const v = await testConnection(s.ankiUrl);
+      setStatus(`Connected. AnkiConnect version ${v}.`);
     } catch (e) {
-      setStatus(`Failed: ${String(e)}`)
+      setStatus(`Failed: ${String(e)}`);
     }
   }
 
@@ -28,7 +44,9 @@ export function Settings() {
       <h1 className="text-lg font-semibold text-slate-200">Settings</h1>
 
       <label className="block">
-        <span className="mb-1 block text-xs text-slate-400">AnkiConnect URL</span>
+        <span className="mb-1 block text-xs text-slate-400">
+          AnkiConnect URL
+        </span>
         <input
           value={s.ankiUrl}
           onChange={(e) => setS({ ...s, ankiUrl: e.target.value })}
@@ -37,7 +55,9 @@ export function Settings() {
       </label>
 
       <label className="block">
-        <span className="dev mb-1 block text-xs text-slate-400">Deck name</span>
+        <span className="dev mb-1 block text-xs text-slate-400">
+          Active deck name (rename on save)
+        </span>
         <input
           value={s.deckName}
           onChange={(e) => setS({ ...s, deckName: e.target.value })}
@@ -47,7 +67,9 @@ export function Settings() {
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="mb-1 block text-xs text-slate-400">Input scheme (you type)</span>
+          <span className="mb-1 block text-xs text-slate-400">
+            Input scheme (you type)
+          </span>
           <select
             value={s.inputScheme}
             onChange={(e) => setS({ ...s, inputScheme: e.target.value })}
@@ -61,7 +83,9 @@ export function Settings() {
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs text-slate-400">Output scheme (preview/convert)</span>
+          <span className="mb-1 block text-xs text-slate-400">
+            Output scheme (preview/convert)
+          </span>
           <select
             value={s.outputScheme}
             onChange={(e) => setS({ ...s, outputScheme: e.target.value })}
@@ -77,10 +101,16 @@ export function Settings() {
       </div>
       <div className="rounded border border-slate-800 bg-slate-900/50 px-3 py-2 text-sm">
         <span className="text-xs text-slate-500">preview: </span>
-        <span className="dev text-slate-300">{transliterate('vfdDiH', 'slp1', s.inputScheme)}</span>
+        <span className="dev text-slate-300">
+          {transliterate("vfdDiH", "slp1", s.inputScheme)}
+        </span>
         <span className="px-2 text-slate-600">→</span>
         <span className="dev text-emerald-200">
-          {transliterate(transliterate('vfdDiH', 'slp1', s.inputScheme), s.inputScheme, s.outputScheme)}
+          {transliterate(
+            transliterate("vfdDiH", "slp1", s.inputScheme),
+            s.inputScheme,
+            s.outputScheme,
+          )}
         </span>
       </div>
 
@@ -101,7 +131,8 @@ export function Settings() {
 
       <label className="block">
         <span className="mb-1 block text-xs text-slate-400">
-          Anki card font size — {s.ankiFontSize}px (rendered Anki card scales from this)
+          Anki card font size — {s.ankiFontSize}px (rendered Anki card scales
+          from this)
         </span>
         <input
           type="range"
@@ -115,14 +146,18 @@ export function Settings() {
       </label>
 
       <div className="block">
-        <span className="mb-1 block text-xs text-slate-400">Theme (web + Anki card)</span>
+        <span className="mb-1 block text-xs text-slate-400">
+          Theme (web + Anki card)
+        </span>
         <div className="flex gap-2">
-          {(['dark', 'light'] as const).map((t) => (
+          {(["dark", "light"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setS({ ...s, theme: t })}
               className={`rounded px-3 py-1.5 text-sm ${
-                s.theme === t ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-300'
+                s.theme === t
+                  ? "bg-sky-600 text-white"
+                  : "bg-slate-800 text-slate-300"
               }`}
             >
               {t}
@@ -132,10 +167,16 @@ export function Settings() {
       </div>
 
       <div className="flex gap-2">
-        <button onClick={save} className="rounded bg-emerald-600 px-4 py-2 hover:bg-emerald-500">
+        <button
+          onClick={save}
+          className="rounded bg-emerald-600 px-4 py-2 hover:bg-emerald-500"
+        >
           Save
         </button>
-        <button onClick={test} className="rounded bg-sky-600 px-4 py-2 hover:bg-sky-500">
+        <button
+          onClick={test}
+          className="rounded bg-sky-600 px-4 py-2 hover:bg-sky-500"
+        >
           Test connection
         </button>
         <button
@@ -155,20 +196,24 @@ export function Settings() {
       <div className="rounded-lg border border-amber-700/50 bg-amber-950/20 p-4 text-sm text-amber-100/90">
         <p className="mb-2 font-semibold text-amber-300">Connecting to Anki</p>
         <ol className="list-decimal space-y-1 pl-5">
-          <li>Install the AnkiConnect add-on (code <code>2055492159</code>) and keep Anki open.</li>
           <li>
-            Anki → Tools → Add-ons → AnkiConnect → Config. Add this site's origin to{' '}
-            <code>webCorsOriginList</code>:
+            Install the AnkiConnect add-on (code <code>2055492159</code>) and
+            keep Anki open.
+          </li>
+          <li>
+            Anki → Tools → Add-ons → AnkiConnect → Config. Add this site's
+            origin to <code>webCorsOriginList</code>:
             <pre className="mt-1 overflow-auto rounded bg-slate-950 p-2 text-xs text-slate-200">{`"webCorsOriginList": ["${origin}", "http://localhost:5173"]`}</pre>
           </li>
           <li>Restart Anki, then use “Test connection”.</li>
         </ol>
         <p className="mt-2 text-xs text-amber-200/70">
-          Note: AnkiConnect is HTTP-only on localhost. If this site is opened over HTTPS (GitHub
-          Pages), some browsers block the request as mixed content. Fallbacks: run the app locally
-          over HTTP, or use Export/Import JSON. Current origin: <code>{origin}</code>
+          Note: AnkiConnect is HTTP-only on localhost. If this site is opened
+          over HTTPS (GitHub Pages), some browsers block the request as mixed
+          content. Fallbacks: run the app locally over HTTP, or use
+          Export/Import JSON. Current origin: <code>{origin}</code>
         </p>
       </div>
     </div>
-  )
+  );
 }

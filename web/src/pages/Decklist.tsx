@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Fuse from "fuse.js";
 import {
@@ -27,17 +27,20 @@ function Rich({ html, className }: { html: string; className?: string }) {
 }
 
 function plain(html: string): string {
-  return (html ?? "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return (html ?? "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function Decklist() {
   const nav = useNavigate();
   const { deckName } = useSettings();
-  const [allCards, setAllCards] = useState<Card[]>(() => listCards());
-  const cards = useMemo(
-    () => allCards.filter((c) => deckOf(c) === deckName),
-    [allCards, deckName],
-  );
+  const [cards, setCards] = useState<Card[]>(() => listCards());
+  // re-read the active deck's cards whenever the deck changes
+  useEffect(() => {
+    setCards(listCards(deckName));
+  }, [deckName]);
   const [msg, setMsg] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [activeTags, setActiveTags] = useState<string[]>([]);
@@ -47,7 +50,7 @@ export function Decklist() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   function refresh() {
-    setAllCards(listCards());
+    setCards(listCards());
   }
 
   // tags present on the current cards, for the filter row
