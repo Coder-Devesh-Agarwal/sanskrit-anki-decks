@@ -1,11 +1,13 @@
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { CardEditor } from '../components/CardEditor'
-import { emptyCard, getCard, saveCard } from '../store/cards'
+import { emptyCard, getCard, saveCard, type CardType } from '../store/cards'
 
 export function Author() {
   const { id } = useParams()
+  const [params] = useSearchParams()
   const nav = useNavigate()
-  const initial = id ? getCard(id) ?? emptyCard() : emptyCard()
+  const type: CardType = params.get('type') === 'generic' ? 'generic' : 'astadhyayi'
+  const initial = id ? (getCard(id) ?? emptyCard(type)) : emptyCard(type)
 
   return (
     <div className="space-y-4">

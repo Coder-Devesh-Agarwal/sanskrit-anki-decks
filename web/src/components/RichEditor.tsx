@@ -14,6 +14,8 @@ interface Props {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  /** show the per-field "apply ↧" transliterate button (default true) */
+  showApply?: boolean;
 }
 
 // Treat an editor with no text content as empty (avoids storing "<p></p>").
@@ -21,7 +23,7 @@ function htmlOf(editor: Editor): string {
   return editor.getText().trim() === "" ? "" : editor.getHTML();
 }
 
-export function RichEditor({ value, onChange }: Props) {
+export function RichEditor({ value, onChange, showApply = true }: Props) {
   const { inputScheme, outputScheme } = useSettings();
 
   const editor = useEditor({
@@ -145,15 +147,19 @@ export function RichEditor({ value, onChange }: Props) {
         >
           1. List
         </button>
-        <span className="flex-1" />
-        <button
-          type="button"
-          onClick={applyTranslit}
-          title="Transliterate text (input → output scheme), keeping formatting"
-          className="rounded bg-emerald-700 px-2 py-0.5 text-xs text-emerald-50 hover:bg-emerald-600"
-        >
-          apply ↧
-        </button>
+        {showApply && (
+          <>
+            <span className="flex-1" />
+            <button
+              type="button"
+              onClick={applyTranslit}
+              title="Transliterate text (input → output scheme), keeping formatting"
+              className="rounded bg-emerald-700 px-2 py-0.5 text-xs text-emerald-50 hover:bg-emerald-600"
+            >
+              apply ↧
+            </button>
+          </>
+        )}
       </div>
       <EditorContent editor={editor} />
     </div>

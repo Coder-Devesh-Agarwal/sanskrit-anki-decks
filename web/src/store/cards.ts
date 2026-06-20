@@ -2,18 +2,37 @@
 // The static site has no backend; this is the source of truth, and AnkiConnect
 // sync (anki/ankiConnect.ts) pushes from here.
 
+import { loadSettings, DEFAULT_DECK } from './settings'
+
 export type Direction = 'forward' | 'reverse'
+
+// 'astadhyayi' = the śabda-siddhi derivation card (steps + sūtras).
+// 'generic'    = a plain book-study Q&A card (front/back + source + note).
+export type CardType = 'astadhyayi' | 'generic'
+
+export function deckOf(c: Card): string {
+  return c.deck || DEFAULT_DECK
+}
+
+export function cardType(c: Card): CardType {
+  return c.type || 'astadhyayi'
+}
 
 export interface Step {
   expr: string // expression / intermediate form at this step
-  vidhiSutraIds: string[] // shown on the step (front of reveal)
-  linkedSutraIds: string[] // paribhāṣā/sañjñā etc, revealed on click
-  note: string // note for the main (vidhi) sūtras
+  vidhiSutraIds: string[] // (astadhyayi) shown on the step (front of reveal)
+  linkedSutraIds: string[] // (astadhyayi) paribhāṣā/sañjñā etc, revealed on click
+  head?: string // (generic) free-text head notes shown on the step, in place of sūtras
+  note: string // note for the main sūtras / head
   linkedNote?: string // separate note for the secondary (linked) sūtras
 }
 
 export interface Card {
   id: string
+  /** card type (defaults to 'astadhyayi' when absent) */
+  type?: CardType
+  /** deck this card belongs to (defaults to DEFAULT_DECK when absent) */
+  deck?: string
   direction: Direction
   question: string
   finalResult: string
@@ -52,15 +71,19 @@ export function uid(): string {
   return 'c-' + Math.random().toString(36).slice(2) + Date.now().toString(36)
 }
 
-export function emptyCard(): Card {
+export function emptyCard(type: CardType = 'astadhyayi'): Card {
   const now = Date.now()
   return {
     id: uid(),
+    type,
+    deck: loadSettings().deckName,
     direction: 'forward',
     question: '',
     finalResult: '',
     finalResultNote: '',
-    steps: [{ expr: '', vidhiSutraIds: [], linkedSutraIds: [], note: '', linkedNote: '' }],
+    steps: [
+      { expr: '', vidhiSutraIds: [], linkedSutraIds: [], head: '', note: '', linkedNote: '' },
+    ],
     cardNote: '',
     tags: [],
     createdAt: now,

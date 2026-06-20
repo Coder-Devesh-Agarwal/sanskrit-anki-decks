@@ -7,9 +7,10 @@ import {
   duplicateCard,
   downloadJson,
   importJson,
+  deckOf,
   type Card,
 } from "../store/cards";
-import { loadSettings } from "../store/settings";
+import { loadSettings, patchSettings, useSettings } from "../store/settings";
 import { syncCards, fetchCards } from "../anki/ankiConnect";
 
 // Canonical study layout. The Anki note template (anki/template.ts) reproduces
@@ -31,14 +32,22 @@ function plain(html: string): string {
 
 export function Decklist() {
   const nav = useNavigate();
-  const [cards, setCards] = useState<Card[]>(() => listCards());
+  const { deckName } = useSettings();
+  const [allCards, setAllCards] = useState<Card[]>(() => listCards());
+  const cards = useMemo(
+    () => allCards.filter((c) => deckOf(c) === deckName),
+    [allCards, deckName],
+  );
   const [msg, setMsg] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<
+    "updated" | "created" | "question" | "direction"
+  >("updated");
   const fileRef = useRef<HTMLInputElement>(null);
 
   function refresh() {
-    setCards(listCards());
+    setAllCards(listCards());
   }
 
   // tags present on the current cards, for the filter row
@@ -87,11 +96,29 @@ export function Decklist() {
     return fuse.search(q).map((r) => r.item.card);
   }, [query, tagFiltered, fuse]);
 
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      switch (sortBy) {
+        case "created":
+          return b.createdAt - a.createdAt;
+        case "question":
+          return plain(a.question).localeCompare(plain(b.question));
+        case "direction":
+          return a.direction.localeCompare(b.direction);
+        default:
+          return b.updatedAt - a.updatedAt;
+      }
+    });
+    return arr;
+  }, [filtered, sortBy]);
+
   async function syncAll() {
     const s = loadSettings();
     setMsg("Syncing…");
     try {
-      const r = await syncCards(s.ankiUrl, s.deckName, listCards());
+      const deckCards = listCards().filter((c) => deckOf(c) === s.deckName);
+      const r = await syncCards(s.ankiUrl, s.deckName, deckCards);
       setMsg(
         `Synced — ${r.added} added, ${r.updated} updated into “${s.deckName}”.`,
       );
@@ -110,6 +137,12 @@ export function Decklist() {
         return;
       }
       const n = importJson(JSON.stringify(fetched)); // merge by id (Anki wins)
+      // register any decks the fetched cards belong to
+      const cur = loadSettings();
+      const merged = Array.from(
+        new Set([...cur.decks, ...fetched.map((c) => deckOf(c))]),
+      );
+      if (merged.length !== cur.decks.length) patchSettings({ decks: merged });
       refresh();
       setMsg(`Fetched ${n} card(s) from Anki.`);
     } catch (e) {
@@ -182,12 +215,25 @@ export function Decklist() {
 
       {cards.length > 0 && (
         <div className="space-y-2">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search question / result / steps / tags…"
-            className="dev w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-sky-500"
-          />
+          <div className="flex gap-2">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search question / result / steps / tags…"
+              className="dev w-full flex-1 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-sky-500"
+            />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              title="Sort cards"
+              className="shrink-0 rounded border border-slate-700 bg-slate-900 px-2 py-2 text-sm text-slate-300 outline-none focus:border-sky-500"
+            >
+              <option value="updated">Sort: updated</option>
+              <option value="created">Sort: created</option>
+              <option value="question">Sort: question A–Z</option>
+              <option value="direction">Sort: direction</option>
+            </select>
+          </div>
           {allTags.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5">
               {allTags.map((t) => (
@@ -220,13 +266,13 @@ export function Decklist() {
         <div className="rounded border border-dashed border-slate-700 p-8 text-center text-slate-500">
           No cards yet. Create one.
         </div>
-      ) : filtered.length === 0 ? (
+      ) : sorted.length === 0 ? (
         <div className="rounded border border-dashed border-slate-700 p-8 text-center text-slate-500">
           No cards match.
         </div>
       ) : (
         <ul className="space-y-2">
-          {filtered.map((c) => (
+          {sorted.map((c) => (
             <li
               key={c.id}
               className="flex items-center gap-3 rounded-lg border border-slate-700 bg-slate-900/60 p-3"

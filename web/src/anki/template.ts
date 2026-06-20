@@ -6,6 +6,7 @@
 // note, sūtra gloss) is pure HTML/CSS via <details> and :hover/:focus-within.
 
 import type { Card } from "../store/cards";
+import { cardType } from "../store/cards";
 import { CATEGORY_META, getSutra } from "../data/sutras";
 import { getGloss } from "../data/glosses";
 import { loadSettings } from "../store/settings";
@@ -104,29 +105,34 @@ export function renderBack(card: Card): string {
   h += `</div>`;
 
   // steps
+  const generic = cardType(card) === "generic";
   h += `<div class="ss-steps"><div class="lbl">सिद्धि-क्रमः (Steps)</div>`;
   card.steps.forEach((st, i) => {
-    const vidhi = st.vidhiSutraIds.map(chipHtml).join("");
+    // on-step content: head notes (generic) or vidhi chips (astadhyayi)
+    const onStep = generic
+      ? st.head
+        ? `<div class="ss-note rich-html">${st.head}</div>`
+        : ""
+      : `<div class="ss-chips">${st.vidhiSutraIds.map(chipHtml).join("")}</div>`;
+
     let reveal = "";
-    // main note, directly below the vidhi sūtras
     if (st.note) reveal += `<div class="ss-note rich-html">${st.note}</div>`;
-    // secondary sūtras as a numbered list
-    if (st.linkedSutraIds.length) {
+    if (!generic && st.linkedSutraIds.length) {
       reveal +=
         `<div class="ss-rlbl">सम्बद्ध-सूत्राणि</div>` +
         `<ol class="ss-linked">` +
         st.linkedSutraIds.map((id) => `<li>${chipHtml(id)}</li>`).join("") +
         `</ol>`;
     }
-    // separate note for the secondary sūtras
-    if (st.linkedNote)
+    if (!generic && st.linkedNote)
       reveal += `<div class="ss-note rich-html">${st.linkedNote}</div>`;
+
     const hasReveal = reveal !== "";
     const head =
       `<span class="ss-num">${i + 1}</span>` +
       `<div class="ss-body">` +
       `<div class="expr rich-html">${st.expr}</div>` +
-      `<div class="ss-chips">${vidhi}</div>` +
+      onStep +
       `</div>`;
     h += hasReveal
       ? `<details class="ss-step"><summary>${head}</summary><div class="ss-reveal">${reveal}</div></details>`
@@ -162,6 +168,7 @@ function stepsText(card: Card): string {
   return card.steps
     .map((st, i) => {
       const parts: string[] = [];
+      if (st.head) parts.push(`head: ${stripHtml(st.head)}`);
       if (st.vidhiSutraIds.length)
         parts.push(`vidhi: ${st.vidhiSutraIds.map(sutraLabel).join("; ")}`);
       if (st.linkedSutraIds.length)
@@ -238,7 +245,7 @@ ${FONT_FACE_CSS}
 .rich-html ul{list-style:disc;margin:.25em 0;padding-left:1.25em}
 .rich-html ol{list-style:decimal;margin:.25em 0;padding-left:1.25em}
 .rich-html u{text-decoration:underline}
-.ss-result{border:1px solid var(--res-border);background:var(--res-bg);border-radius:10px;padding:14px;margin-top:16px}
+.ss-result{border:1px solid var(--res-border);background:var(--res-bg);border-radius:10px;padding:10px;margin-top:16px}
 .ss-result .lbl{font-size:.7em;font-weight:600;text-transform:uppercase;color:var(--res-lbl);margin-bottom:4px}
 .ss-result .val{font-size:1.5em;font-weight:600;color:var(--res-val)}
 .ss-inline{margin-top:8px}
@@ -246,7 +253,7 @@ ${FONT_FACE_CSS}
 .ss-inline>summary::-webkit-details-marker{display:none}
 .ss-steps{margin-top:16px}
 .ss-steps .lbl{font-size:.7em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
-.ss-step{border:1px solid var(--border);background:var(--step-bg);border-radius:10px;margin-bottom:8px;padding:12px}
+.ss-step{border:1px solid var(--border);background:var(--step-bg);border-radius:10px;margin-bottom:8px;padding:10px}
 .ss-step>summary{display:flex;align-items:flex-start;gap:8px;cursor:pointer;list-style:none}
 .ss-step>summary::-webkit-details-marker{display:none}
 .ss-step>summary::after{content:'▸';margin-left:8px;color:var(--muted);flex-shrink:0}
@@ -268,7 +275,7 @@ ${FONT_FACE_CSS}
 .ss-nlbl{display:block;font-size:.62em;text-transform:uppercase;letter-spacing:.05em;color:var(--nlbl);margin-bottom:2px}
 .ss-ntxt{display:block;font-size:.75em;color:var(--fg);line-height:1.5;max-height:180px;overflow:auto}
 .ss-note{font-size:.875em;color:var(--note);margin-top:6px}
-.ss-cardnote{border:1px solid var(--cn-border);background:var(--cn-bg);border-radius:10px;padding:12px;margin-top:16px}
+.ss-cardnote{border:1px solid var(--cn-border);background:var(--cn-bg);border-radius:10px;padding:10px;margin-top:16px}
 .ss-cardnote .lbl{font-size:.7em;font-weight:600;text-transform:uppercase;color:var(--cn-lbl);margin-bottom:4px}
 .ss-cardnote .val{font-size:.875em;color:var(--cn-val)}
 .bcat-vidhi{background:#0284c7;color:#e0f2fe}

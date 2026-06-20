@@ -5,7 +5,10 @@ import { useSyncExternalStore } from 'react'
 
 export interface Settings {
   ankiUrl: string
+  /** the active deck (sync target + new-card assignment + list filter) */
   deckName: string
+  /** all known deck names */
+  decks: string[]
   /** scheme the user types in */
   inputScheme: string
   /** scheme previews/conversions are shown in */
@@ -21,9 +24,12 @@ export interface Settings {
 const KEY = 'shabdasiddhi.settings'
 const EVENT = 'ss-settings-changed'
 
+export const DEFAULT_DECK = 'Śabda-Siddhi'
+
 export const DEFAULT_SETTINGS: Settings = {
   ankiUrl: 'http://127.0.0.1:8765',
-  deckName: 'Śabda-Siddhi',
+  deckName: DEFAULT_DECK,
+  decks: [DEFAULT_DECK],
   inputScheme: 'hk',
   outputScheme: 'devanagari',
   baseFontSize: 16,
@@ -43,6 +49,9 @@ export function loadSettings(): Settings {
   } catch {
     _cache = { ...DEFAULT_SETTINGS }
   }
+  // guarantee the active deck is always part of the deck list
+  if (!_cache.decks?.length) _cache.decks = [DEFAULT_DECK]
+  if (!_cache.decks.includes(_cache.deckName)) _cache.decks = [..._cache.decks, _cache.deckName]
   return _cache
 }
 

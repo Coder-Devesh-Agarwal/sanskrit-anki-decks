@@ -34,3 +34,20 @@ export function transliterate(text: string, from: string, to: string): string {
     return text
   }
 }
+
+// Transliterate the text of an HTML fragment, leaving tags/markup intact.
+export function transliterateHtml(html: string, from: string, to: string): string {
+  if (!html || from === to) return html
+  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html')
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT)
+  const nodes: Text[] = []
+  let n = walker.nextNode()
+  while (n) {
+    nodes.push(n as Text)
+    n = walker.nextNode()
+  }
+  for (const t of nodes) {
+    if (t.nodeValue) t.nodeValue = transliterate(t.nodeValue, from, to)
+  }
+  return doc.body.innerHTML
+}

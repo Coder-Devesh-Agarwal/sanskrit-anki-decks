@@ -5,6 +5,9 @@ import { SutraChip } from './SutraChip'
 import { RichEditor } from './RichEditor'
 import { TagInput } from './TagInput'
 import { suggestLinkedIds } from '../data/sutras'
+import { transliterateHtml } from '../lib/translit'
+import { loadSettings } from '../store/settings'
+import { cardType } from '../store/cards'
 
 // Authoring form. Mutates a local copy and calls onSave with the result.
 export function CardEditor({
@@ -28,9 +31,14 @@ export function CardEditor({
       return { ...c, steps }
     })
   }
+  const isGeneric = cardType(card) === 'generic'
+
   function addStep() {
     patch({
-      steps: [...card.steps, { expr: '', vidhiSutraIds: [], linkedSutraIds: [], note: '' }],
+      steps: [
+        ...card.steps,
+        { expr: '', vidhiSutraIds: [], linkedSutraIds: [], head: '', note: '' },
+      ],
     })
   }
   function removeStep(i: number) {
@@ -67,8 +75,32 @@ export function CardEditor({
     onSave(card)
   }
 
+  // Transliterate every rich text field of the whole card (input → output scheme),
+  // preserving formatting. One button instead of per-field.
+  function applyAll() {
+    const { inputScheme: from, outputScheme: to } = loadSettings()
+    const tr = (h: string) => transliterateHtml(h, from, to)
+    setCard((c) => ({
+      ...c,
+      question: tr(c.question),
+      finalResult: tr(c.finalResult),
+      finalResultNote: tr(c.finalResultNote),
+      cardNote: tr(c.cardNote),
+      steps: c.steps.map((st) => ({
+        ...st,
+        expr: tr(st.expr),
+        head: tr(st.head ?? ''),
+        note: tr(st.note),
+        linkedNote: tr(st.linkedNote ?? ''),
+      })),
+    }))
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      <div className="text-xs uppercase tracking-wide text-slate-500">
+        Type: <span className="text-slate-300">{isGeneric ? 'Generic (book)' : 'Aṣṭādhyāyī'}</span>
+      </div>
       <section className="space-y-3 rounded-xl border border-slate-700 bg-slate-900/60 p-4">
         <Field label="दिशा (Direction)">
           <div className="flex gap-2">
@@ -123,52 +155,65 @@ export function CardEditor({
             <Field label="रूपम् (expression at this step)">
               <RichEditor value={st.expr} onChange={(v) => patchStep(i, { expr: v })} />
             </Field>
-            <Field label="विधि-सूत्राणि (vidhi — shown on front of step)">
-              <SutraAutocomplete onSelect={(id) => addVidhi(i, id)} />
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {st.vidhiSutraIds.map((id) => (
-                  <SutraChip
-                    key={id}
-                    id={id}
-                    onRemove={() =>
-                      patchStep(i, {
-                        vidhiSutraIds: st.vidhiSutraIds.filter((x) => x !== id),
-                      })
-                    }
+            {isGeneric ? (
+              <>
+                <Field label="शीर्ष-टिप्पणी (head notes — shown on the step)">
+                  <RichEditor value={st.head ?? ''} onChange={(v) => patchStep(i, { head: v })} />
+                </Field>
+                <Field label="टिप्पणी (note — revealed on click)">
+                  <RichEditor value={st.note} onChange={(v) => patchStep(i, { note: v })} />
+                </Field>
+              </>
+            ) : (
+              <>
+                <Field label="विधि-सूत्राणि (vidhi — shown on front of step)">
+                  <SutraAutocomplete onSelect={(id) => addVidhi(i, id)} />
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {st.vidhiSutraIds.map((id) => (
+                      <SutraChip
+                        key={id}
+                        id={id}
+                        onRemove={() =>
+                          patchStep(i, {
+                            vidhiSutraIds: st.vidhiSutraIds.filter((x) => x !== id),
+                          })
+                        }
+                      />
+                    ))}
+                  </div>
+                </Field>
+                <Field label="टिप्पणी (note — below main sūtras)">
+                  <RichEditor value={st.note} onChange={(v) => patchStep(i, { note: v })} />
+                </Field>
+                <Field label="सम्बद्ध-सूत्राणि (paribhāṣā / sañjñā — revealed on click)">
+                  <SutraAutocomplete
+                    placeholder="link a paribhāṣā / sañjñā sūtra…"
+                    onSelect={(id) => addLinked(i, id)}
                   />
-                ))}
-              </div>
-            </Field>
-            <Field label="टिप्पणी (note — below main sūtras)">
-              <RichEditor value={st.note} onChange={(v) => patchStep(i, { note: v })} />
-            </Field>
-            <Field label="सम्बद्ध-सूत्राणि (paribhāṣā / sañjñā — revealed on click)">
-              <SutraAutocomplete
-                placeholder="link a paribhāṣā / sañjñā sūtra…"
-                onSelect={(id) => addLinked(i, id)}
-              />
-              <ol className="mt-2 list-decimal space-y-1.5 pl-5">
-                {st.linkedSutraIds.map((id) => (
-                  <li key={id}>
-                    <SutraChip
-                      id={id}
-                      showGloss
-                      onRemove={() =>
-                        patchStep(i, {
-                          linkedSutraIds: st.linkedSutraIds.filter((x) => x !== id),
-                        })
-                      }
-                    />
-                  </li>
-                ))}
-              </ol>
-            </Field>
-            <Field label="सम्बद्ध-टिप्पणी (note — for secondary sūtras)">
-              <RichEditor
-                value={st.linkedNote ?? ''}
-                onChange={(v) => patchStep(i, { linkedNote: v })}
-              />
-            </Field>
+                  <ol className="mt-2 list-decimal space-y-1.5 pl-5">
+                    {st.linkedSutraIds.map((id) => (
+                      <li key={id}>
+                        <SutraChip
+                          id={id}
+                          showGloss
+                          onRemove={() =>
+                            patchStep(i, {
+                              linkedSutraIds: st.linkedSutraIds.filter((x) => x !== id),
+                            })
+                          }
+                        />
+                      </li>
+                    ))}
+                  </ol>
+                </Field>
+                <Field label="सम्बद्ध-टिप्पणी (note — for secondary sūtras)">
+                  <RichEditor
+                    value={st.linkedNote ?? ''}
+                    onChange={(v) => patchStep(i, { linkedNote: v })}
+                  />
+                </Field>
+              </>
+            )}
           </div>
         ))}
       </section>
@@ -182,7 +227,14 @@ export function CardEditor({
         </Field>
       </section>
 
-      <div className="flex gap-3">
+      <div className="sticky bottom-0 flex gap-3 border-t border-slate-800 bg-slate-950/80 p-3 backdrop-blur">
+        <button
+          onClick={applyAll}
+          title="Transliterate all fields (input → output scheme), keeping formatting"
+          className="rounded bg-sky-700 px-5 py-2 font-medium hover:bg-sky-600"
+        >
+          Apply All ↧
+        </button>
         <button onClick={submit} className="rounded bg-emerald-600 px-5 py-2 font-medium hover:bg-emerald-500">
           Save card
         </button>
