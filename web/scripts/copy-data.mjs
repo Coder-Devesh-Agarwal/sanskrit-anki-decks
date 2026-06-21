@@ -12,7 +12,12 @@ mkdirSync(dst, { recursive: true })
 
 const required = ['sutraani_data.json']
 // Gloss sources for the sūtra meaning popover: English summary + LSK + SK note.
-const optional = ['vasu_english_summary.json', 'laghukaumudi.json', 'kaumudi.json']
+const optional = [
+  'vasu_english_summary.json',
+  'laghukaumudi.json',
+  'kaumudi.json',
+  'vartika.json',
+]
 
 for (const f of required) {
   const from = join(src, f)

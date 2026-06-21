@@ -283,6 +283,7 @@ ${FONT_FACE_CSS}
 .bcat-paribhasha{background:#9333ea;color:#f3e8ff}
 .bcat-atidesha{background:#d97706;color:#fef3c7}
 .bcat-adhikara{background:#e11d48;color:#ffe4e6}
+.bcat-vartika{background:#0d9488;color:#ccfbf1}
 .bcat-other{background:#475569;color:#f1f5f9}
 .ss-badge{border-radius:4px;padding:1px 5px;font-size:.62em;font-weight:600}
 `;

@@ -11,6 +11,7 @@ export type SutraCategory =
   | 'paribhasha'
   | 'atidesha'
   | 'adhikara'
+  | 'vartika'
   | 'other'
 
 export interface RawSutra {
@@ -72,6 +73,7 @@ export const CATEGORY_META: Record<
   paribhasha: { label: 'परिभाषा', badge: 'bg-purple-600 text-purple-50' },
   atidesha: { label: 'अतिदेश', badge: 'bg-amber-600 text-amber-50' },
   adhikara: { label: 'अधिकार', badge: 'bg-rose-600 text-rose-50' },
+  vartika: { label: 'वार्तिक', badge: 'bg-teal-600 text-teal-50' },
   other: { label: '—', badge: 'bg-slate-600 text-slate-50' },
 }
 
@@ -145,10 +147,46 @@ export async function loadSutras(): Promise<void> {
     const json = await res.json()
     const arr: RawSutra[] = Array.isArray(json) ? json : json.data
     _all = arr.map(normalize)
+    await appendVartikas() // optional supplement
     _byId = new Map(_all.map((s) => [s.id, s]))
     _fuse = null // rebuilt lazily against the new data
   })()
   return _loading
+}
+
+interface RawVartika {
+  sutra: string // sūtra ref, e.g. "1.1.9"
+  vartika: string // Devanagari vārtika text
+}
+
+// Fold vārtikas (data_files/vartika.json) into the index as a `vartika` category,
+// so they appear in search and can be attached like sūtras. Optional/non-fatal.
+async function appendVartikas(): Promise<void> {
+  try {
+    const res = await fetch(dataUrl('vartika.json'))
+    if (!res.ok) return
+    const json = await res.json()
+    const arr: RawVartika[] = Array.isArray(json) ? json : json.data
+    const seq = new Map<string, number>()
+    for (const v of arr) {
+      if (!v?.vartika) continue
+      const n = (seq.get(v.sutra) ?? 0) + 1
+      seq.set(v.sutra, n)
+      _all.push({
+        id: `vt:${v.sutra}#${n}`,
+        s: v.vartika,
+        e: '',
+        ss: '',
+        ref: v.sutra,
+        slp: toSlp(v.vartika),
+        category: 'vartika',
+        typeLabel: 'वार्तिक',
+        anuvritti: [],
+      })
+    }
+  } catch {
+    /* vārtikas are optional */
+  }
 }
 
 export function getSutra(id: string): Sutra | undefined {
