@@ -3,7 +3,7 @@
 // of duplicating it (analogous to the genanki guid scheme in the repo).
 
 import type { Card } from "../store/cards";
-import { emptyCard } from "../store/cards";
+import { emptyCard, syncOf } from "../store/cards";
 import {
   MODEL_NAME,
   MODEL_FIELDS,
@@ -74,6 +74,68 @@ function fieldsFor(card: Card): Record<string, string> {
 export interface SyncResult {
   added: number;
   updated: number;
+  /** notes deleted from Anki because their card's sync flag is off */
+  removed: number;
+}
+
+export interface DeckSyncGroup {
+  /** deck name as it should appear in Anki (sub decks: "Parent::Sub") */
+  deckName: string;
+  cards: Card[];
+}
+
+// Push several decks' cards into Anki in one go (model/fonts ensured once).
+// Cards with sync=false are not pushed; if they were synced before, their
+// existing note is deleted so the Anki deck mirrors the flag.
+export async function syncCardGroups(
+  url: string,
+  groups: DeckSyncGroup[],
+): Promise<SyncResult> {
+  await ensureModel(url);
+  await uploadFont(url);
+  let added = 0;
+  let updated = 0;
+  let removed = 0;
+  for (const { deckName, cards } of groups) {
+    await ensureDeck(url, deckName);
+    for (const card of cards) {
+      const found = await invoke<number[]>(url, "findNotes", {
+        query: `note:"${MODEL_NAME}" CardId:"${card.id}"`,
+      });
+      if (!syncOf(card)) {
+        if (found.length > 0) {
+          await invoke(url, "deleteNotes", { notes: found });
+          removed++;
+        }
+        continue;
+      }
+      const fields = fieldsFor(card);
+      if (found.length > 0) {
+        await invoke(url, "updateNoteFields", {
+          note: { id: found[0], fields },
+        });
+        if (card.tags.length) {
+          await invoke(url, "addTags", {
+            notes: [found[0]],
+            tags: card.tags.join(" "),
+          });
+        }
+        updated++;
+      } else {
+        await invoke(url, "addNote", {
+          note: {
+            deckName,
+            modelName: MODEL_NAME,
+            fields,
+            tags: card.tags,
+            options: { allowDuplicate: false },
+          },
+        });
+        added++;
+      }
+    }
+  }
+  return { added, updated, removed };
 }
 
 // Push the given cards into Anki, creating model+deck as needed.
@@ -82,41 +144,7 @@ export async function syncCards(
   deckName: string,
   cards: Card[],
 ): Promise<SyncResult> {
-  await ensureModel(url);
-  await ensureDeck(url, deckName);
-  await uploadFont(url);
-  let added = 0;
-  let updated = 0;
-  for (const card of cards) {
-    const fields = fieldsFor(card);
-    const found = await invoke<number[]>(url, "findNotes", {
-      query: `note:"${MODEL_NAME}" CardId:"${card.id}"`,
-    });
-    if (found.length > 0) {
-      await invoke(url, "updateNoteFields", {
-        note: { id: found[0], fields },
-      });
-      if (card.tags.length) {
-        await invoke(url, "addTags", {
-          notes: [found[0]],
-          tags: card.tags.join(" "),
-        });
-      }
-      updated++;
-    } else {
-      await invoke(url, "addNote", {
-        note: {
-          deckName,
-          modelName: MODEL_NAME,
-          fields,
-          tags: card.tags,
-          options: { allowDuplicate: false },
-        },
-      });
-      added++;
-    }
-  }
-  return { added, updated };
+  return syncCardGroups(url, [{ deckName, cards }]);
 }
 
 interface NoteInfo {

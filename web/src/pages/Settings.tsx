@@ -1,8 +1,11 @@
 import { useRef, useState } from "react";
 import {
   DEFAULT_SETTINGS,
+  deckMetaOf,
   loadSettings,
   saveSettings,
+  setDeckMeta,
+  type DeckType,
 } from "../store/settings";
 import { testConnection } from "../anki/ankiConnect";
 import { renameDeck } from "../store/cards";
@@ -13,19 +16,35 @@ export function Settings() {
   const [status, setStatus] = useState<string | null>(null);
   const origin = window.location.origin;
   const originalDeck = useRef(loadSettings().deckName);
+  const initialMeta = deckMetaOf(originalDeck.current);
+  const [deckType, setDeckType] = useState<DeckType>(initialMeta.type);
+  const [deckParent, setDeckParent] = useState(initialMeta.parent ?? "");
+  const composites = s.decks.filter(
+    (d) => d !== originalDeck.current && deckMetaOf(d).type === "composite",
+  );
 
   function save() {
     const old = originalDeck.current;
     const next = s.deckName.trim() || old;
     // renaming the active deck moves its cards + updates the deck list
     if (next !== old) {
-      renameDeck(old, next);
+      renameDeck(old, next); // also rewrites deckMeta keys/parent links
       const decks = s.decks.map((d) => (d === old ? next : d));
-      saveSettings({ ...s, deckName: next, decks });
+      // deckMeta from storage: renameDeck just rewrote it, s's copy is stale
+      saveSettings({
+        ...s,
+        deckMeta: loadSettings().deckMeta,
+        deckName: next,
+        decks,
+      });
       originalDeck.current = next;
     } else {
-      saveSettings(s);
+      saveSettings({ ...s, deckMeta: loadSettings().deckMeta });
     }
+    // apply the active deck's type/parent
+    if (deckType === "sub" && deckParent)
+      setDeckMeta(next, { type: "sub", parent: deckParent });
+    else setDeckMeta(next, { type: deckType === "sub" ? "default" : deckType });
     setStatus("Saved.");
   }
 
@@ -64,6 +83,44 @@ export function Settings() {
           className="dev w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-sky-500"
         />
       </label>
+
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="mb-1 block text-xs text-slate-400">
+            Deck type (independent / composite / sub)
+          </span>
+          <select
+            value={deckType}
+            onChange={(e) => setDeckType(e.target.value as DeckType)}
+            className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-sky-500"
+          >
+            <option value="default">Independent (default)</option>
+            <option value="composite">Composite (holds sub decks)</option>
+            <option value="sub" disabled={composites.length === 0}>
+              Sub deck{composites.length === 0 ? " — no composite decks" : ""}
+            </option>
+          </select>
+        </label>
+        {deckType === "sub" && composites.length > 0 && (
+          <label className="block">
+            <span className="mb-1 block text-xs text-slate-400">
+              Parent composite (Anki deck “parent::name”)
+            </span>
+            <select
+              value={deckParent}
+              onChange={(e) => setDeckParent(e.target.value)}
+              className="dev w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-sky-500"
+            >
+              <option value="">— choose parent —</option>
+              {composites.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block">

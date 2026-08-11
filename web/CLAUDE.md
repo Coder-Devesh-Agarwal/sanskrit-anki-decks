@@ -72,11 +72,31 @@ separate Python/genanki pipeline; do not touch it for web work).
 
 ## Card model (`store/cards.ts`)
 ```ts
-Card { id, direction: 'forward'|'reverse', question, finalResult, finalResultNote,
-       steps: Step[], cardNote, tags[], createdAt, updatedAt }
-Step { expr, vidhiSutraIds[], linkedSutraIds[], note /* below main sūtras */, linkedNote? /* for secondary */ }
+Card { id, type?: 'astadhyayi'|'generic', deck?, sync?: boolean, direction: 'forward'|'reverse',
+       question, finalResult, finalResultNote, steps: Step[], cardNote, tags[], createdAt, updatedAt }
+Step { expr, vidhiSutraIds[], linkedSutraIds[], head?, note /* below main sūtras */, linkedNote? /* for secondary */ }
 ```
 All text fields hold **rich HTML** (from RichEditor), not plain text. Render with HTML, not `{text}`.
+- `sync` (absent = true): per-card Anki-sync flag, toggled by the switch on each Decklist row via
+  `setCardSync` (metadata-only write — does NOT bump `updatedAt`). `sync:false` cards stay in
+  localStorage/JSON but are skipped on sync, and any previously synced Anki note is **deleted** on the
+  next sync (`syncCardGroups` reports it in `removed`).
+
+## Decks & deck types
+- Cards are stored per deck (`shabdasiddhi.cards::<slug>`); active deck lives in settings (`deckName`,
+  full list in `decks`). Deck picker (header, `App.tsx`) switches/creates decks via a modal.
+- **Three deck types** in `settings.deckMeta[name] = {type, parent?}` (absent = `default`):
+  - `default` — independent deck, syncs to Anki under its own name.
+  - `composite` — parent deck; “Sync to Anki” on it syncs its own cards **plus every sub deck**.
+  - `sub` — belongs to a composite (`parent`); syncs to Anki as `Parent::Sub` (real Anki subdeck).
+- Helpers: `deckMetaOf/deckTypeOf/subDecksOf/ankiDeckName/setDeckMeta/renameDeckMeta` (settings.ts),
+  `syncScope(deck)` (cards.ts) = deck + its subs when composite. `renameDeck` also rewrites deckMeta
+  keys and children's `parent` links. Type/parent of the **active** deck is editable in Settings.
+- New-deck modal (`NewDeckDialog` in App.tsx) offers the three types; `sub` requires choosing an
+  existing composite parent.
+- Export JSON format: `{format:'shabdasiddhi', decks:[{name,type,parent?}], cards:[…]}` covering the
+  active deck + subs when composite; import accepts this **and** the legacy plain card array, and
+  registers imported deck names/meta into settings.
 
 ## Card layout (both web CardView and Anki)
 - Front: prompt (by direction) + question.
@@ -91,6 +111,8 @@ All text fields hold **rich HTML** (from RichEditor), not plain text. Render wit
   Granular fields are plain-text (`stripHtml`) for Browse inspection; `Json` is exact `JSON.stringify(card)`
   for **lossless fetch-back**; `Front/Back` carry rich HTML.
 - Upsert keyed by `CardId` (`findNotes` → `updateNoteFields` else `addNote`) so re-sync updates, no dupes.
+  Sync entry point is `syncCardGroups(url, [{deckName, cards}])` (model/fonts ensured once per call;
+  `deckName` here is the **Anki** name, i.e. `ankiDeckName(webDeck)`); `syncCards` is a one-group wrapper.
 - `fetchCards` reconstructs Cards from notes (prefers `Json`, falls back to granular fields).
 - Font: `FONT_FACES` (4 Adishila Vedic faces) uploaded to Anki media as `_adishila_vedic*.ttf` via
   `storeMediaFile` on each sync; `@font-face` in model CSS references those media names.

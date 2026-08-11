@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { loadSutras } from "./data/sutras";
 import { loadGlosses } from "./data/glosses";
-import { useSettings, patchSettings } from "./store/settings";
+import {
+  useSettings,
+  patchSettings,
+  setDeckMeta,
+  loadSettings,
+  type DeckType,
+} from "./store/settings";
 import { FONT_FACES } from "./anki/template";
 import { TranslitPalette } from "./components/TranslitPalette";
 
@@ -98,35 +104,143 @@ function NewCardMenu() {
 }
 
 function DeckPicker() {
-  const { deckName, decks } = useSettings();
+  const { deckName, decks, deckMeta } = useSettings();
+  const [creating, setCreating] = useState(false);
   const NEW = "__new__";
-  function onChange(v: string) {
-    if (v === NEW) {
-      const name = prompt("New deck name")?.trim();
-      if (!name) return;
-      const decksNext = decks.includes(name) ? decks : [...decks, name];
-      patchSettings({ decks: decksNext, deckName: name });
-    } else {
-      patchSettings({ deckName: v });
-    }
+
+  // Display order: top-level decks (default/composite/orphaned subs), each
+  // composite immediately followed by its sub decks.
+  const subsOf = (p: string) =>
+    decks.filter((d) => deckMeta[d]?.type === "sub" && deckMeta[d]?.parent === p);
+  const ordered = decks
+    .filter((d) => {
+      const m = deckMeta[d];
+      return m?.type !== "sub" || !m.parent || !decks.includes(m.parent);
+    })
+    .flatMap((d) => [d, ...subsOf(d)]);
+
+  function label(d: string) {
+    const m = deckMeta[d];
+    if (m?.type === "sub" && m.parent && decks.includes(m.parent))
+      return `  ↳ ${d}`;
+    if (m?.type === "composite") return `${d} (composite)`;
+    return d;
   }
+
+  function onChange(v: string) {
+    if (v === NEW) setCreating(true);
+    else patchSettings({ deckName: v });
+  }
+
   return (
-    <label className="flex items-center gap-1.5 text-xs text-slate-400">
-      <span className="hidden sm:inline">Deck</span>
-      <select
-        value={deckName}
-        onChange={(e) => onChange(e.target.value)}
-        title="Active deck"
-        className="dev rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-200 outline-none focus:border-sky-500"
+    <>
+      <label className="flex items-center gap-1.5 text-xs text-slate-400">
+        <span className="hidden sm:inline">Deck</span>
+        <select
+          value={deckName}
+          onChange={(e) => onChange(e.target.value)}
+          title="Active deck"
+          className="dev rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-200 outline-none focus:border-sky-500"
+        >
+          {ordered.map((d) => (
+            <option key={d} value={d}>
+              {label(d)}
+            </option>
+          ))}
+          <option value={NEW}>＋ New deck…</option>
+        </select>
+      </label>
+      {creating && <NewDeckDialog onClose={() => setCreating(false)} />}
+    </>
+  );
+}
+
+function NewDeckDialog({ onClose }: { onClose: () => void }) {
+  const { decks, deckMeta } = useSettings();
+  const composites = decks.filter((d) => deckMeta[d]?.type === "composite");
+  const [name, setName] = useState("");
+  const [type, setType] = useState<DeckType>("default");
+  const [parent, setParent] = useState(composites[0] ?? "");
+
+  function create() {
+    const n = name.trim();
+    if (!n) return;
+    const s = loadSettings();
+    if (type === "sub" && parent) setDeckMeta(n, { type: "sub", parent });
+    else setDeckMeta(n, { type });
+    const decksNext = s.decks.includes(n) ? s.decks : [...s.decks, n];
+    patchSettings({ decks: decksNext, deckName: n });
+    onClose();
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      onClick={onClose}
+    >
+      <div
+        className="w-80 space-y-3 rounded-lg border border-slate-700 bg-slate-900 p-4"
+        onClick={(e) => e.stopPropagation()}
       >
-        {decks.map((d) => (
-          <option key={d} value={d}>
-            {d}
-          </option>
-        ))}
-        <option value={NEW}>＋ New deck…</option>
-      </select>
-    </label>
+        <p className="text-sm font-semibold text-slate-200">New deck</p>
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && create()}
+          placeholder="Deck name"
+          className="dev w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-500"
+        />
+        <div className="space-y-1">
+          <span className="block text-xs text-slate-400">Deck type</span>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value as DeckType)}
+            className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200 outline-none focus:border-sky-500"
+          >
+            <option value="default">Independent (default)</option>
+            <option value="composite">Composite (can hold sub decks)</option>
+            <option value="sub" disabled={composites.length === 0}>
+              Sub deck of a composite
+              {composites.length === 0 ? " — no composite decks yet" : ""}
+            </option>
+          </select>
+        </div>
+        {type === "sub" && composites.length > 0 && (
+          <div className="space-y-1">
+            <span className="block text-xs text-slate-400">
+              Parent composite deck (syncs to Anki as “parent::name”)
+            </span>
+            <select
+              value={parent}
+              onChange={(e) => setParent(e.target.value)}
+              className="dev w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm text-slate-200 outline-none focus:border-sky-500"
+            >
+              {composites.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            onClick={onClose}
+            className="rounded bg-slate-700 px-3 py-1.5 text-sm hover:bg-slate-600"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={create}
+            disabled={!name.trim()}
+            className="rounded bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+          >
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

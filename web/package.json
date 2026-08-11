@@ -8,6 +8,7 @@
     "dev": "vite",
     "prebuild": "node scripts/copy-data.mjs",
     "typecheck": "tsc --noEmit",
+    "gen:lsk-deck": "node scripts/gen-lsk-deck.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },

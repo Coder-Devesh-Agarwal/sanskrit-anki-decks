@@ -8,10 +8,18 @@ import {
   downloadJson,
   importJson,
   deckOf,
+  syncOf,
+  setCardSync,
+  syncScope,
   type Card,
 } from "../store/cards";
-import { loadSettings, patchSettings, useSettings } from "../store/settings";
-import { syncCards, fetchCards } from "../anki/ankiConnect";
+import {
+  ankiDeckName,
+  loadSettings,
+  patchSettings,
+  useSettings,
+} from "../store/settings";
+import { syncCardGroups, fetchCards } from "../anki/ankiConnect";
 
 // Canonical study layout. The Anki note template (anki/template.ts) reproduces
 // this same structure/behaviour. Card text fields hold rich HTML produced by the
@@ -120,11 +128,15 @@ export function Decklist() {
     const s = loadSettings();
     setMsg("Syncing…");
     try {
-      const deckCards = listCards().filter((c) => deckOf(c) === s.deckName);
-      const r = await syncCards(s.ankiUrl, s.deckName, deckCards);
-      setMsg(
-        `Synced — ${r.added} added, ${r.updated} updated into “${s.deckName}”.`,
-      );
+      // active deck, plus its sub decks when it is composite
+      const groups = syncScope(s.deckName).map((d) => ({
+        deckName: ankiDeckName(d),
+        cards: listCards(d),
+      }));
+      const r = await syncCardGroups(s.ankiUrl, groups);
+      const into = groups.map((g) => `“${g.deckName}”`).join(", ");
+      const removed = r.removed ? `, ${r.removed} removed (sync off)` : "";
+      setMsg(`Synced — ${r.added} added, ${r.updated} updated${removed} into ${into}.`);
     } catch (e) {
       setMsg(`Sync failed: ${String(e)} — check Settings / AnkiConnect.`);
     }
@@ -299,6 +311,28 @@ export function Decklist() {
               <span className="text-xs text-slate-500">
                 {c.steps.length} steps
               </span>
+              <button
+                role="switch"
+                aria-checked={syncOf(c)}
+                onClick={() => {
+                  setCardSync(c.id, !syncOf(c));
+                  refresh();
+                }}
+                title={
+                  syncOf(c)
+                    ? "Included in Anki sync — click to exclude"
+                    : "Excluded from Anki sync (removed on next sync) — click to include"
+                }
+                className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                  syncOf(c) ? "bg-emerald-600" : "bg-slate-700"
+                }`}
+              >
+                <span
+                  className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+                    syncOf(c) ? "translate-x-4" : ""
+                  }`}
+                />
+              </button>
               <Link
                 to={`/author/${c.id}`}
                 className="rounded bg-slate-800 px-2 py-1 text-xs hover:bg-slate-700"

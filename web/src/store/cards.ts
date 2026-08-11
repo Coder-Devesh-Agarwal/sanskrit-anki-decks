@@ -2,7 +2,15 @@
 // The static site has no backend; this is the source of truth, and AnkiConnect
 // sync (anki/ankiConnect.ts) pushes from here.
 
-import { loadSettings, DEFAULT_DECK } from "./settings";
+import {
+  loadSettings,
+  patchSettings,
+  renameDeckMeta,
+  setDeckMeta,
+  subDecksOf,
+  DEFAULT_DECK,
+  type DeckMeta,
+} from "./settings";
 
 export type Direction = "forward" | "reverse";
 
@@ -16,6 +24,26 @@ export function deckOf(c: Card): string {
 
 export function cardType(c: Card): CardType {
   return c.type || "astadhyayi";
+}
+
+// Whether the card takes part in Anki sync (absent = true).
+export function syncOf(c: Card): boolean {
+  return c.sync !== false;
+}
+
+// Flip a card's sync flag and persist it. Metadata-only: does not touch
+// updatedAt, so the card keeps its position under the "updated" sort.
+export function setCardSync(id: string, sync: boolean): void {
+  migrate();
+  for (const d of allDeckNames()) {
+    const cards = readDeck(d);
+    const idx = cards.findIndex((c) => c.id === id);
+    if (idx >= 0) {
+      cards[idx] = { ...cards[idx], sync };
+      writeDeck(d, cards);
+      return;
+    }
+  }
 }
 
 export interface Step {
@@ -33,6 +61,8 @@ export interface Card {
   type?: CardType;
   /** deck this card belongs to (defaults to DEFAULT_DECK when absent) */
   deck?: string;
+  /** false = keep in JSON/localStorage but exclude from the synced Anki deck (absent = true) */
+  sync?: boolean;
   direction: Direction;
   question: string;
   finalResult: string;
@@ -210,7 +240,8 @@ export function duplicateCard(id: string): Card | undefined {
   return copy;
 }
 
-// Rename a deck: move its cards' storage key and update each card's deck field.
+// Rename a deck: move its cards' storage key, update each card's deck field,
+// and keep deck meta (type/parent links) pointing at the new name.
 export function renameDeck(oldName: string, newName: string): void {
   if (oldName === newName) return;
   migrate();
@@ -218,18 +249,54 @@ export function renameDeck(oldName: string, newName: string): void {
   const merged = [...readDeck(newName), ...cards];
   writeDeck(newName, merged);
   localStorage.removeItem(deckKey(oldName));
+  renameDeckMeta(oldName, newName);
 }
 
-// Export the active deck's cards.
+// The decks a sync of `deck` covers: the deck itself, plus every sub deck when
+// it is composite.
+export function syncScope(deck: string = loadSettings().deckName): string[] {
+  return [deck, ...subDecksOf(deck)];
+}
+
+interface DeckExportEntry extends DeckMeta {
+  name: string;
+}
+
+// Export format: { format, decks: [{name,type,parent}], cards: [...] }.
+// Covers the active deck plus its sub decks when it is composite.
 export function exportJson(deck: string = loadSettings().deckName): string {
-  return JSON.stringify(listCards(deck), null, 2);
+  const s = loadSettings();
+  const scope = syncScope(deck);
+  const decks: DeckExportEntry[] = scope.map((d) => ({
+    name: d,
+    ...(s.deckMeta[d] ?? { type: "default" as const }),
+  }));
+  const cards = scope.flatMap((d) => listCards(d));
+  return JSON.stringify({ format: "shabdasiddhi", decks, cards }, null, 2);
 }
 
-// Import cards (merge by id). Cards without a deck go to the active deck.
+// Import cards (merge by id). Accepts the current { decks, cards } format and
+// the legacy plain card array. Cards without a deck go to the active deck.
 export function importJson(text: string): number {
-  const incoming = JSON.parse(text) as Card[];
-  if (!Array.isArray(incoming))
-    throw new Error("Expected a JSON array of cards");
+  const parsed = JSON.parse(text) as
+    | Card[]
+    | { decks?: DeckExportEntry[]; cards?: Card[] };
+  let incoming: Card[];
+  if (Array.isArray(parsed)) {
+    incoming = parsed;
+  } else if (parsed && Array.isArray(parsed.cards)) {
+    incoming = parsed.cards;
+    // register imported deck names + their type/parent meta
+    for (const d of parsed.decks ?? []) {
+      if (!d || typeof d.name !== "string") continue;
+      const s = loadSettings();
+      if (!s.decks.includes(d.name))
+        patchSettings({ decks: [...s.decks, d.name] });
+      setDeckMeta(d.name, { type: d.type ?? "default", parent: d.parent });
+    }
+  } else {
+    throw new Error("Expected a JSON array of cards or a deck export object");
+  }
   const current = loadSettings().deckName;
   for (const c of incoming) {
     if (c && typeof c.id === "string")
