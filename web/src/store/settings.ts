@@ -32,6 +32,12 @@ export interface Settings {
   ankiFontSize: number
   /** UI + card colour theme */
   theme: 'dark' | 'light'
+  /** auto-backup every deck to a local folder (File System Access API) */
+  backupEnabled: boolean
+  /** minutes between auto-backups */
+  backupIntervalMinutes: number
+  /** ms epoch of the last successful backup (status display only) */
+  lastBackupAt: number
 }
 
 const KEY = 'shabdasiddhi.settings'
@@ -49,6 +55,9 @@ export const DEFAULT_SETTINGS: Settings = {
   baseFontSize: 16,
   ankiFontSize: 20,
   theme: 'dark',
+  backupEnabled: false,
+  backupIntervalMinutes: 15,
+  lastBackupAt: 0,
 }
 
 let _cache: Settings | null = null

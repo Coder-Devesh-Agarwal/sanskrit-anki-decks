@@ -11,11 +11,12 @@ import {
 } from "./store/settings";
 import { FONT_FACES } from "./anki/template";
 import { TranslitPalette } from "./components/TranslitPalette";
+import { initBackupHandle, startAutoBackup, stopAutoBackup, backupNow } from "./lib/folderBackup";
 
 export function App() {
   const [ready, setReady] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const { baseFontSize, theme } = useSettings();
+  const { baseFontSize, theme, backupEnabled, backupIntervalMinutes } = useSettings();
 
   useEffect(() => {
     // Glosses are optional — never block the app on them.
@@ -34,6 +35,26 @@ export function App() {
   useEffect(() => {
     document.documentElement.classList.toggle("theme-light", theme === "light");
   }, [theme]);
+
+  // Local-folder auto-backup (Settings → "Local folder backup"). Re-hydrates
+  // the granted folder handle from IndexedDB, then starts/stops the interval
+  // timer as the setting changes; skips silently (no re-prompt) if the
+  // browser doesn't support it or permission hasn't been (re-)granted yet.
+  useEffect(() => {
+    let cancelled = false;
+    initBackupHandle().then(({ state }) => {
+      if (cancelled || !backupEnabled) return;
+      if (state === "granted") backupNow().then(() => patchSettings({ lastBackupAt: Date.now() })).catch(() => {});
+      startAutoBackup(backupIntervalMinutes, (r) => {
+        if (r.ok) patchSettings({ lastBackupAt: Date.now() });
+      });
+    });
+    if (!backupEnabled) stopAutoBackup();
+    return () => {
+      cancelled = true;
+      stopAutoBackup();
+    };
+  }, [backupEnabled, backupIntervalMinutes]);
 
   // Inject Adishila Vedic @font-face with base-aware URLs (works on GitHub Pages).
   useEffect(() => {

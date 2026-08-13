@@ -1,15 +1,26 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DEFAULT_SETTINGS,
   deckMetaOf,
   loadSettings,
+  patchSettings,
   saveSettings,
   setDeckMeta,
+  useSettings,
   type DeckType,
 } from "../store/settings";
 import { testConnection } from "../anki/ankiConnect";
 import { renameDeck } from "../store/cards";
 import { SCHEMES, transliterate } from "../lib/translit";
+import {
+  FSA_SUPPORTED,
+  backupNow,
+  backupStatus,
+  forgetBackupFolder,
+  pickBackupFolder,
+  reauthorizeBackupFolder,
+  type BackupStatus,
+} from "../lib/folderBackup";
 
 export function Settings() {
   const [s, setS] = useState(() => loadSettings());
@@ -223,6 +234,8 @@ export function Settings() {
         </div>
       </div>
 
+      <BackupSection />
+
       <div className="flex gap-2">
         <button
           onClick={save}
@@ -271,6 +284,155 @@ export function Settings() {
           Export/Import JSON. Current origin: <code>{origin}</code>
         </p>
       </div>
+    </div>
+  );
+}
+
+// Local-folder auto-backup (File System Access API). Self-contained so its
+// async status polling doesn't tangle with the rest of the Settings form.
+// The actual interval scheduler lives in App.tsx (runs app-wide, not just
+// while this page is mounted); this section just grants/revokes the folder
+// and configures/reads the settings the scheduler watches.
+function BackupSection() {
+  const { backupEnabled, backupIntervalMinutes, lastBackupAt } = useSettings();
+  const [status, setStatus] = useState<BackupStatus>({ name: null, state: "none" });
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    backupStatus().then(setStatus);
+  }, []);
+
+  async function choose() {
+    setBusy(true);
+    try {
+      setStatus(await pickBackupFolder());
+      setMsg(null);
+    } catch (e) {
+      setMsg(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reallow() {
+    setBusy(true);
+    try {
+      const state = await reauthorizeBackupFolder();
+      setStatus((s) => ({ ...s, state }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runNow() {
+    setBusy(true);
+    setMsg("Backing up…");
+    try {
+      const r = await backupNow();
+      patchSettings({ lastBackupAt: Date.now() });
+      setMsg(`Saved ${(r.bytes / 1024).toFixed(1)} KB → ${r.file}`);
+    } catch (e) {
+      setMsg(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function forget() {
+    if (!confirm("Forget the backup folder? Auto-backup stops until you choose a new one.")) return;
+    await forgetBackupFolder();
+    setStatus({ name: null, state: "none" });
+    setMsg(null);
+  }
+
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-4 text-sm">
+      <p className="mb-1 font-semibold text-slate-200">Local folder backup</p>
+      <p className="mb-3 text-xs text-slate-500">
+        Writes every deck straight to a folder on this device on a timer — no Anki, no downloads
+        folder clutter. Independent of Anki sync; a plain snapshot you can hand back to Import JSON.
+      </p>
+
+      {!FSA_SUPPORTED ? (
+        <p className="text-xs text-amber-300">
+          This browser doesn't support saving straight to a folder (Chrome/Edge only). Use Export JSON
+          on the Cards page instead.
+        </p>
+      ) : (
+        <>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-400">
+              Folder:{" "}
+              <span className="text-slate-200">
+                {status.name ?? "(none chosen)"}
+                {status.name && ` — ${status.state}`}
+              </span>
+            </span>
+            {status.state === "prompt" && (
+              <button
+                onClick={reallow}
+                disabled={busy}
+                className="rounded bg-amber-700 px-2 py-1 text-xs hover:bg-amber-600 disabled:opacity-50"
+              >
+                Re-allow
+              </button>
+            )}
+          </div>
+
+          <div className="mb-3 flex flex-wrap gap-2">
+            <button
+              onClick={choose}
+              disabled={busy}
+              className="rounded bg-slate-700 px-3 py-1.5 text-xs hover:bg-slate-600 disabled:opacity-50"
+            >
+              {status.name ? "Change folder" : "Choose folder"}
+            </button>
+            <button
+              onClick={runNow}
+              disabled={busy || status.state !== "granted"}
+              className="rounded bg-sky-600 px-3 py-1.5 text-xs hover:bg-sky-500 disabled:opacity-50"
+            >
+              Backup now
+            </button>
+            {status.name && (
+              <button
+                onClick={forget}
+                disabled={busy}
+                className="rounded bg-slate-700 px-3 py-1.5 text-xs hover:bg-rose-900/60 hover:text-rose-300 disabled:opacity-50"
+              >
+                Forget folder
+              </button>
+            )}
+          </div>
+
+          <label className="mb-1 flex items-center gap-2 text-xs text-slate-400">
+            <input
+              type="checkbox"
+              checked={backupEnabled}
+              onChange={(e) => patchSettings({ backupEnabled: e.target.checked })}
+            />
+            Auto-backup every
+            <select
+              value={backupIntervalMinutes}
+              onChange={(e) => patchSettings({ backupIntervalMinutes: Number(e.target.value) })}
+              className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-xs text-slate-200 outline-none focus:border-sky-500"
+            >
+              {[5, 15, 30, 60].map((m) => (
+                <option key={m} value={m}>
+                  {m} min
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <p className="text-xs text-slate-500">
+            Last backup: {lastBackupAt ? new Date(lastBackupAt).toLocaleString() : "never"}
+          </p>
+        </>
+      )}
+
+      {msg && <p className="mt-2 text-xs text-slate-300">{msg}</p>}
     </div>
   );
 }

@@ -1,12 +1,18 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import { App } from './App'
 import { Decklist } from './pages/Decklist'
 import { Author } from './pages/Author'
 import { Study } from './pages/Study'
 import { Settings } from './pages/Settings'
+
+// Precaches the app shell + sūtra data + fonts so the app works fully offline
+// once installed; `registerType: 'autoUpdate'` (vite.config.ts) applies new
+// deploys on the next load with no user prompt.
+registerSW({ immediate: true })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -262,6 +262,23 @@ interface DeckExportEntry extends DeckMeta {
   name: string;
 }
 
+// Full backup: every deck + every card (used by the local-folder auto-backup
+// in lib/folderBackup.ts, and available for a manual "Export everything").
+// `settings` is included for reference only — importJson() ignores it.
+export function exportAllJson(): string {
+  const s = loadSettings();
+  const decks: DeckExportEntry[] = s.decks.map((d) => ({
+    name: d,
+    ...(s.deckMeta[d] ?? { type: "default" as const }),
+  }));
+  const cards = listAllCards();
+  return JSON.stringify(
+    { format: "shabdasiddhi", capturedAt: new Date().toISOString(), decks, cards, settings: s },
+    null,
+    2,
+  );
+}
+
 // Export format: { format, decks: [{name,type,parent}], cards: [...] }.
 // Covers the active deck plus its sub decks when it is composite.
 export function exportJson(deck: string = loadSettings().deckName): string {
@@ -277,26 +294,41 @@ export function exportJson(deck: string = loadSettings().deckName): string {
 
 // Import cards (merge by id). Accepts the current { decks, cards } format and
 // the legacy plain card array. Cards without a deck go to the active deck.
+//
+// Registers every deck a card actually lands in, not just the ones listed in
+// `decks[]` — a hand-edited file, or the legacy plain-array format, can carry
+// a card.deck that has no matching decks[] entry; without this the card is
+// written to storage correctly but its deck never shows up in the picker.
+// Existing decks' type/parent meta is only touched when this import
+// explicitly declares it, so a re-import never demotes a composite/sub deck.
 export function importJson(text: string): number {
   const parsed = JSON.parse(text) as
     | Card[]
     | { decks?: DeckExportEntry[]; cards?: Card[] };
   let incoming: Card[];
+  const declared = new Map<string, DeckMeta>();
   if (Array.isArray(parsed)) {
     incoming = parsed;
   } else if (parsed && Array.isArray(parsed.cards)) {
     incoming = parsed.cards;
-    // register imported deck names + their type/parent meta
     for (const d of parsed.decks ?? []) {
       if (!d || typeof d.name !== "string") continue;
-      const s = loadSettings();
-      if (!s.decks.includes(d.name))
-        patchSettings({ decks: [...s.decks, d.name] });
-      setDeckMeta(d.name, { type: d.type ?? "default", parent: d.parent });
+      declared.set(d.name, { type: d.type ?? "default", parent: d.parent });
     }
   } else {
     throw new Error("Expected a JSON array of cards or a deck export object");
   }
+
+  const referenced = new Set(declared.keys());
+  for (const c of incoming) if (c?.deck) referenced.add(c.deck);
+  for (const name of referenced) {
+    const s = loadSettings();
+    const isNew = !s.decks.includes(name);
+    if (isNew) patchSettings({ decks: [...s.decks, name] });
+    if (declared.has(name)) setDeckMeta(name, declared.get(name)!);
+    else if (isNew) setDeckMeta(name, { type: "default" });
+  }
+
   const current = loadSettings().deckName;
   for (const c of incoming) {
     if (c && typeof c.id === "string")
