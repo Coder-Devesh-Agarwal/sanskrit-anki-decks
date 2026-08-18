@@ -13,20 +13,22 @@
 //   step.note       — sūtrārtha, detailed (sutrartha.json[id].sd, HTML-sanitized)
 //
 // Usage (from web/):  node scripts/gen-lsk-deck.mjs [--deck "Name"] [--out path] [--sync]
+// Output defaults to ../decks/json/lsk_deck.json
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(here, "..", "..", "data_files");
+const decksDir = join(here, "..", "..", "decks", "json"); // generated decks
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(name);
   return i >= 0 ? process.argv[i + 1] : fallback;
 }
 const DECK_NAME = arg("--deck", "लघुसिद्धान्तकौमुदी");
-const OUT_PATH = resolve(arg("--out", join(dataDir, "lsk_deck.json")));
+const OUT_PATH = resolve(arg("--out", join(decksDir, "lsk_deck.json")));
 const SYNC_DEFAULT = process.argv.includes("--sync");
 
 function loadJson(name, required = true) {
@@ -161,6 +163,7 @@ const out = {
   cards,
 };
 
+mkdirSync(dirname(OUT_PATH), { recursive: true });
 writeFileSync(OUT_PATH, JSON.stringify(out, null, 2));
 console.log(`[gen-lsk-deck] wrote ${cards.length} cards to ${OUT_PATH}`);
 console.log(`[gen-lsk-deck] deck "${DECK_NAME}", sync=${SYNC_DEFAULT} — import via Decklist → Import JSON.`);

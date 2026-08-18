@@ -9,13 +9,19 @@ separate Python/genanki pipeline; do not touch it for web work).
 - Vite + React 18 + TypeScript, Tailwind CSS v4 (`@tailwindcss/vite`), React Router v6 (HashRouter).
 - TipTap v3 (ProseMirror) for rich text. Fuse.js for fuzzy search. `@indic-transliteration/sanscript`
   for transliteration.
-- No backend/state server. Source of truth = browser **localStorage**; Anki sync is the bridge out.
+- No backend/state server. Source of truth = browser **IndexedDB** (`store/persist.ts` mirror; db `shabdasiddhi`, store `kv`); Anki sync is the bridge out.
 
 ## Commands (run inside `web/`)
 - `npm run dev` — `predev` copies data, then Vite dev server (http://localhost:5173).
 - `npm run build` — `prebuild` copies data, then `vite build` → `dist/`. (Chunk-size warning from TipTap is expected/benign.)
 - `npm run typecheck` — `tsc --noEmit`. Run this + build after changes.
 - `scripts/copy-data.mjs` (`predev`/`prebuild`) copies `../data_files/*.json` → `public/data/`.
+- `scripts/gen-sutra-front-deck.mjs` / `gen-sutra-number-front-deck.mjs` (+ shared `scripts/lib/sutra-deck.mjs`)
+  — generate the full-Aṣṭādhyāyī reference decks (3983 `generic`, `sync:false` cards; back = pada-cheda,
+  anuvṛtti, adhikāra, ss, LSK, SK, sūtrārtha, English). `--split` emits a **composite** deck with one
+  **sub** deck per adhyāya (add `--files` for one file per adhyāya); `--adhyaya N` for a single one.
+  Output goes to `../decks/json/` (created on demand) — `data_files/` stays source data only.
+  Card markup uses the `sd-*` classes defined in BOTH `src/index.css` and `MODEL_CSS` — keep them in sync.
 
 ## Lockfile / CI gotcha (important)
 - CI (`.github/workflows/deploy.yml`) runs `npm ci` on **Node 20 = npm 10**. Local dev is Node 24 = npm 11.
@@ -51,8 +57,16 @@ separate Python/genanki pipeline; do not touch it for web work).
   (auto-suggest S/P/AT/AD from a vidhi's `an`), `parseType`/category meta. `slp` field precomputed per sūtra.
 - `data/glosses.ts` — lazy gloss maps; `getGloss(id)` → `{english, note, noteSource}` (LSK preferred, SK fallback).
 - `lib/translit.ts` — `transliterate(text, from, to)` (sanscript wrapper) + `SCHEMES` list.
-- `store/cards.ts` — Card model + localStorage CRUD (`shabdasiddhi.cards`), `duplicateCard`, JSON
-  export/import, persistent tag history (`knownTags`, `shabdasiddhi.tags`).
+- `store/persist.ts` — durable key→string storage: IndexedDB (`lib/idb.ts`) behind a **synchronous
+  in-memory mirror**, so `cards.ts`/`settings.ts` stay sync. `hydrate()` fills the mirror and is
+  awaited in `main.tsx` **before the first render** — a store read before it returns nothing. Writes
+  update the mirror at once and flush on a serialized queue (`flush()` awaits them). A pre-IndexedDB
+  profile is copied over once (keys prefixed `shabdasiddhi.`, marker `shabdasiddhi.migrated-to-idb`);
+  the old localStorage copy is left untouched but never written again. If IndexedDB is unusable
+  (private mode), it falls back to localStorage transparently.
+- `lib/idb.ts` — dependency-free IndexedDB kv helper (`idbGetAll`/`idbSet`/`idbDelete`).
+- `store/cards.ts` — Card model + CRUD over `persist` (`shabdasiddhi.cards::<slug>` per deck),
+  `duplicateCard`, JSON export/import, persistent tag history (`knownTags`, `shabdasiddhi.tags`).
 - `store/settings.ts` — settings + reactive `useSettings()` (useSyncExternalStore) + `loadSettings`/
   `patchSettings`. Keys: ankiUrl, deckName, inputScheme, outputScheme, baseFontSize (web), ankiFontSize
   (Anki card), theme (`dark|light`).
@@ -79,18 +93,20 @@ Step { expr, vidhiSutraIds[], linkedSutraIds[], head?, note /* below main sūtra
 All text fields hold **rich HTML** (from RichEditor), not plain text. Render with HTML, not `{text}`.
 - `sync` (absent = true): per-card Anki-sync flag, toggled by the switch on each Decklist row via
   `setCardSync` (metadata-only write — does NOT bump `updatedAt`). `sync:false` cards stay in
-  localStorage/JSON but are skipped on sync, and any previously synced Anki note is **deleted** on the
+  IndexedDB/JSON but are skipped on sync, and any previously synced Anki note is **deleted** on the
   next sync (`syncCardGroups` reports it in `removed`).
 
 ## Decks & deck types
-- Cards are stored per deck (`shabdasiddhi.cards::<slug>`); active deck lives in settings (`deckName`,
+- Cards are stored per deck (`shabdasiddhi.cards::<slug>` in IndexedDB); active deck lives in settings (`deckName`,
   full list in `decks`). Deck picker (header, `App.tsx`) switches/creates decks via a modal.
 - **Three deck types** in `settings.deckMeta[name] = {type, parent?}` (absent = `default`):
   - `default` — independent deck, syncs to Anki under its own name.
   - `composite` — parent deck; “Sync to Anki” on it syncs its own cards **plus every sub deck**.
   - `sub` — belongs to a composite (`parent`); syncs to Anki as `Parent::Sub` (real Anki subdeck).
 - Helpers: `deckMetaOf/deckTypeOf/subDecksOf/ankiDeckName/setDeckMeta/renameDeckMeta` (settings.ts),
-  `syncScope(deck)` (cards.ts) = deck + its subs when composite. `renameDeck` also rewrites deckMeta
+  `syncScope(deck)` (cards.ts) = deck + its subs when composite; `listScopedCards(deck)` = the cards of
+  that scope, which is what Decklist shows (so a composite lists every sub deck's cards, badged by deck,
+  paged 200 at a time). `renameDeck` also rewrites deckMeta
   keys and children's `parent` links. Type/parent of the **active** deck is editable in Settings.
 - New-deck modal (`NewDeckDialog` in App.tsx) offers the three types; `sub` requires choosing an
   existing composite parent.

@@ -1,7 +1,9 @@
-// App settings, persisted in localStorage. Changes are broadcast so all
-// components (transliteration previews, autocomplete) react live.
+// App settings, persisted through store/persist.ts (IndexedDB). Changes are
+// broadcast so all components (transliteration previews, autocomplete) react
+// live.
 
 import { useSyncExternalStore } from 'react'
+import { readValue, writeValue } from './persist'
 
 // 'default'   = independent deck (also assumed when no meta exists)
 // 'composite' = parent deck; syncing it also syncs its sub decks (Parent::Sub)
@@ -65,7 +67,7 @@ let _cache: Settings | null = null
 export function loadSettings(): Settings {
   if (_cache) return _cache
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = readValue(KEY)
     _cache = raw
       ? { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) }
       : { ...DEFAULT_SETTINGS }
@@ -126,7 +128,7 @@ export function renameDeckMeta(oldName: string, newName: string): void {
 
 export function saveSettings(s: Settings): void {
   _cache = s
-  localStorage.setItem(KEY, JSON.stringify(s))
+  writeValue(KEY, JSON.stringify(s))
   window.dispatchEvent(new Event(EVENT))
 }
 

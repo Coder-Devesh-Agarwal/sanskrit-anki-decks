@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Fuse from "fuse.js";
 import {
   listCards,
+  listScopedCards,
   deleteCard,
   duplicateCard,
   downloadJson,
@@ -44,10 +45,12 @@ function plain(html: string): string {
 export function Decklist() {
   const nav = useNavigate();
   const { deckName } = useSettings();
-  const [cards, setCards] = useState<Card[]>(() => listCards());
+  // A composite deck lists its sub decks' cards too, so the 8 adhyāya sub
+  // decks of a split reference deck can be searched/studied as one.
+  const [cards, setCards] = useState<Card[]>(() => listScopedCards());
   // re-read the active deck's cards whenever the deck changes
   useEffect(() => {
-    setCards(listCards(deckName));
+    setCards(listScopedCards(deckName));
   }, [deckName]);
   const [msg, setMsg] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -58,8 +61,18 @@ export function Decklist() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   function refresh() {
-    setCards(listCards());
+    setCards(listScopedCards(deckName));
   }
+
+  // Which deck a card lives in only matters while a composite is active —
+  // that is the only view that mixes decks.
+  const composite = useMemo(() => syncScope(deckName).length > 1, [deckName]);
+
+  // A composite reference deck can hold thousands of cards; render them in
+  // pages so switching to it doesn't build a 4000-row list in one go.
+  const PAGE = 200;
+  const [limit, setLimit] = useState(PAGE);
+  useEffect(() => setLimit(PAGE), [deckName, query, activeTags, sortBy]);
 
   // tags present on the current cards, for the filter row
   const allTags = useMemo(
@@ -287,7 +300,7 @@ export function Decklist() {
         </div>
       ) : (
         <ul className="space-y-2">
-          {sorted.map((c) => (
+          {sorted.slice(0, limit).map((c) => (
             <li
               key={c.id}
               className="flex items-center gap-3 rounded-lg border border-slate-700 bg-slate-900/60 p-3"
@@ -308,6 +321,14 @@ export function Decklist() {
                   html={c.question || c.finalResult || "(untitled)"}
                 />
               </button>
+              {composite && (
+                <span
+                  className="dev hidden shrink-0 rounded bg-slate-800 px-2 py-0.5 text-[11px] text-slate-400 sm:inline"
+                  title="sub deck this card belongs to"
+                >
+                  {deckOf(c)}
+                </span>
+              )}
               <span className="text-xs text-slate-500">
                 {c.steps.length} steps
               </span>
@@ -362,6 +383,25 @@ export function Decklist() {
               </button>
             </li>
           ))}
+          {sorted.length > limit && (
+            <li className="flex items-center justify-center gap-3 rounded-lg border border-dashed border-slate-700 p-3 text-sm text-slate-400">
+              <span>
+                showing {limit} of {sorted.length}
+              </span>
+              <button
+                onClick={() => setLimit((n) => n + PAGE)}
+                className="rounded bg-slate-800 px-3 py-1 text-xs hover:bg-slate-700"
+              >
+                show {Math.min(PAGE, sorted.length - limit)} more
+              </button>
+              <button
+                onClick={() => setLimit(sorted.length)}
+                className="rounded bg-slate-800 px-3 py-1 text-xs hover:bg-slate-700"
+              >
+                show all
+              </button>
+            </li>
+          )}
         </ul>
       )}
     </div>

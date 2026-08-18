@@ -278,6 +278,25 @@ ${FONT_FACE_CSS}
 .ss-cardnote{border:1px solid var(--cn-border);background:var(--cn-bg);border-radius:10px;padding:10px;margin-top:16px}
 .ss-cardnote .lbl{font-size:.7em;font-weight:600;text-transform:uppercase;color:var(--cn-lbl);margin-bottom:4px}
 .ss-cardnote .val{font-size:.875em;color:var(--cn-val)}
+/* Reference-deck card markup (scripts/lib/sutra-deck.mjs); mirrored in index.css */
+.sd-l{font-size:.72em;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.sd-m,.sd-t,.sd-src,.sd-sub,.sd-x{color:var(--ref)}
+.sd-m{font-size:.85em}
+.sd-t{font-size:.72em}
+.sd-src,.sd-x{font-size:.78em}
+.sd-sub{font-size:.8em;margin:2px 0 0}
+.sd-chip{display:inline-block;border:1px solid var(--border);border-radius:6px;padding:3px 7px;margin:0 5px 5px 0}
+.sd-ul{margin:0;padding-left:1.15em;list-style:disc}
+.sd-big,.sd-ref{font-size:1.15em;font-weight:700;margin:0}
+.sd-ref{letter-spacing:.04em}
+.sd-h{display:block;margin-top:.4em;font-weight:700;color:var(--ref)}
+.sd-b{display:inline-block;border-radius:4px;padding:1px 6px;margin:4px 4px 0 0;font-size:.62em;font-weight:600;color:#fff;vertical-align:middle}
+.sd-b.vidhi{background:#0284c7}
+.sd-b.sanjna{background:#059669}
+.sd-b.paribhasha{background:#9333ea}
+.sd-b.atidesha{background:#d97706}
+.sd-b.adhikara{background:#e11d48}
+.sd-b.other{background:#475569}
 .bcat-vidhi{background:#0284c7;color:#e0f2fe}
 .bcat-sanjna{background:#059669;color:#d1fae5}
 .bcat-paribhasha{background:#9333ea;color:#f3e8ff}

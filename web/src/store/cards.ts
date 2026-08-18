@@ -1,7 +1,12 @@
-// localStorage-backed CRUD for śabda-siddhi cards + JSON export/import.
-// The static site has no backend; this is the source of truth, and AnkiConnect
-// sync (anki/ankiConnect.ts) pushes from here.
+// CRUD for śabda-siddhi cards + JSON export/import. The static site has no
+// backend; this is the source of truth, and AnkiConnect sync
+// (anki/ankiConnect.ts) pushes from here.
+//
+// Storage goes through store/persist.ts (IndexedDB with a synchronous mirror),
+// so every function here stays synchronous — but nothing may run before
+// persist.hydrate() has resolved (awaited in main.tsx).
 
+import { keys as persistedKeys, readValue, removeValue, writeValue } from "./persist";
 import {
   loadSettings,
   patchSettings,
@@ -61,7 +66,7 @@ export interface Card {
   type?: CardType;
   /** deck this card belongs to (defaults to DEFAULT_DECK when absent) */
   deck?: string;
-  /** false = keep in JSON/localStorage but exclude from the synced Anki deck (absent = true) */
+  /** false = keep in JSON/local storage but exclude from the synced Anki deck (absent = true) */
   sync?: boolean;
   direction: Direction;
   question: string;
@@ -74,7 +79,7 @@ export interface Card {
   updatedAt: number;
 }
 
-const PREFIX = "shabdasiddhi.cards::"; // one localStorage key per deck
+const PREFIX = "shabdasiddhi.cards::"; // one storage key per deck
 const LEGACY_KEY = "shabdasiddhi.cards"; // pre-multi-deck single array
 const TAGS_KEY = "shabdasiddhi.tags";
 
@@ -84,7 +89,7 @@ function deckKey(deck: string): string {
 
 function readDeck(deck: string): Card[] {
   try {
-    const raw = localStorage.getItem(deckKey(deck));
+    const raw = readValue(deckKey(deck));
     const arr = raw ? (JSON.parse(raw) as Card[]) : [];
     return Array.isArray(arr) ? arr : [];
   } catch {
@@ -93,7 +98,7 @@ function readDeck(deck: string): Card[] {
 }
 
 function writeDeck(deck: string, cards: Card[]): void {
-  localStorage.setItem(deckKey(deck), JSON.stringify(cards));
+  writeValue(deckKey(deck), JSON.stringify(cards));
 }
 
 // One-time migration: split the old single array into per-deck keys.
@@ -102,7 +107,7 @@ function migrate(): void {
   if (_migrated) return;
   _migrated = true;
   try {
-    const raw = localStorage.getItem(LEGACY_KEY);
+    const raw = readValue(LEGACY_KEY);
     if (!raw) return;
     const arr = JSON.parse(raw) as Card[];
     if (Array.isArray(arr)) {
@@ -115,7 +120,7 @@ function migrate(): void {
       }
       for (const [d, list] of byDeck) writeDeck(d, list);
     }
-    localStorage.removeItem(LEGACY_KEY);
+    removeValue(LEGACY_KEY);
   } catch {
     /* ignore */
   }
@@ -123,9 +128,8 @@ function migrate(): void {
 
 function allDeckNames(): string[] {
   const names = new Set<string>();
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k?.startsWith(PREFIX)) names.add(k.slice(PREFIX.length));
+  for (const k of persistedKeys()) {
+    if (k.startsWith(PREFIX)) names.add(k.slice(PREFIX.length));
   }
   return [...names];
 }
@@ -134,7 +138,7 @@ function allDeckNames(): string[] {
 // input can suggest previously-made tags.
 export function knownTags(): string[] {
   try {
-    const raw = localStorage.getItem(TAGS_KEY);
+    const raw = readValue(TAGS_KEY);
     const hist = raw ? (JSON.parse(raw) as string[]) : [];
     const live = listAllCards().flatMap((c) => c.tags);
     return Array.from(new Set([...hist, ...live])).sort();
@@ -146,7 +150,7 @@ export function knownTags(): string[] {
 function recordTags(tags: string[]): void {
   if (!tags.length) return;
   const merged = Array.from(new Set([...knownTags(), ...tags])).sort();
-  localStorage.setItem(TAGS_KEY, JSON.stringify(merged));
+  writeValue(TAGS_KEY, JSON.stringify(merged));
 }
 
 export function uid(): string {
@@ -186,6 +190,13 @@ export function emptyCard(type: CardType = "astadhyayi"): Card {
 export function listCards(deck: string = loadSettings().deckName): Card[] {
   migrate();
   return readDeck(deck);
+}
+
+// Cards of a deck *including* its sub decks when it is composite — what the
+// deck list shows, mirroring what "Sync to Anki" would push (syncScope).
+export function listScopedCards(deck: string = loadSettings().deckName): Card[] {
+  migrate();
+  return syncScope(deck).flatMap((d) => readDeck(d));
 }
 
 // Cards across every deck.
@@ -248,7 +259,7 @@ export function renameDeck(oldName: string, newName: string): void {
   const cards = readDeck(oldName).map((c) => ({ ...c, deck: newName }));
   const merged = [...readDeck(newName), ...cards];
   writeDeck(newName, merged);
-  localStorage.removeItem(deckKey(oldName));
+  removeValue(deckKey(oldName));
   renameDeckMeta(oldName, newName);
 }
 
