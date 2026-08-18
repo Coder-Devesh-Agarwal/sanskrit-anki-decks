@@ -134,9 +134,12 @@ All text fields hold **rich HTML** (from RichEditor), not plain text. Render wit
   `storeMediaFile` on each sync; `@font-face` in model CSS references those media names.
 - Card CSS uses `em` sizes scaled from `.ss-card{font-size}` (baked per card from `ankiFontSize`) and CSS
   vars for colors with a `.ss-light` override for light theme (class baked per card from `theme`).
-- **Model CSS/templates/fields are only set on model CREATION** (`ensureModel` skips existing). After
-  changing model fields/CSS/templates, **delete the `Śabda-Siddhi` note type in Anki once, then re-sync.**
-  Per-card things baked into HTML (font size, theme class, content) apply on a normal re-sync.
+- **CSS + templates are pushed on every sync** — `ensureModel` creates the note type, or calls
+  `updateModelStyling`/`updateModelTemplates` on an existing one (best-effort; a failure only warns).
+  So MODEL_CSS edits land on the next sync, no note-type deletion needed.
+- **Fields are still creation-only**: changing `MODEL_FIELDS` does NOT migrate an existing profile
+  (needs `modelFieldAdd`/`modelFieldRename`, or deleting the note type — which deletes its notes).
+- Per-card things baked into HTML (font size, theme class, content) apply on a normal re-sync.
 
 ## AnkiConnect connectivity
 - Default URL `http://127.0.0.1:8765`, configurable in Settings. AnkiConnect add-on must run.

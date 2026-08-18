@@ -33,16 +33,42 @@ export async function testConnection(url: string): Promise<number> {
   return invoke<number>(url, "version");
 }
 
+// Creates the note type, or — when it already exists — pushes the current
+// styling/templates onto it. Without the update pass, MODEL_CSS changes would
+// only ever reach a *fresh* Anki profile, and the alternative (delete the note
+// type, re-sync) throws away every note of that type.
+//
+// Fields are NOT reconciled here: adding/renaming them is a separate,
+// destructive-ish operation (modelFieldAdd/modelFieldRename). Change
+// MODEL_FIELDS and you still have to fix existing profiles by hand.
 async function ensureModel(url: string): Promise<void> {
   const names = await invoke<string[]>(url, "modelNames");
-  if (names.includes(MODEL_NAME)) return;
-  await invoke(url, "createModel", {
-    modelName: MODEL_NAME,
-    inOrderFields: MODEL_FIELDS,
-    css: MODEL_CSS,
-    isCloze: false,
-    cardTemplates: MODEL_TEMPLATES,
-  });
+  if (!names.includes(MODEL_NAME)) {
+    await invoke(url, "createModel", {
+      modelName: MODEL_NAME,
+      inOrderFields: MODEL_FIELDS,
+      css: MODEL_CSS,
+      isCloze: false,
+      cardTemplates: MODEL_TEMPLATES,
+    });
+    return;
+  }
+  // Best-effort: an older AnkiConnect without these actions must not break sync.
+  try {
+    await invoke(url, "updateModelStyling", {
+      model: { name: MODEL_NAME, css: MODEL_CSS },
+    });
+    await invoke(url, "updateModelTemplates", {
+      model: {
+        name: MODEL_NAME,
+        templates: Object.fromEntries(
+          MODEL_TEMPLATES.map((t) => [t.Name, { Front: t.Front, Back: t.Back }]),
+        ),
+      },
+    });
+  } catch (e) {
+    console.warn("[anki] could not refresh note type styling/templates:", e);
+  }
 }
 
 async function ensureDeck(url: string, deckName: string): Promise<void> {
